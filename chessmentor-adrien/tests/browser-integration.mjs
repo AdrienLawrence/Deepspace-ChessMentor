@@ -457,7 +457,10 @@ try {
     await page.getByLabel('Ask about the selected position').waitFor()
     const board = await page.locator('.board-section .chessboard').boundingBox()
     const composer = await page.getByLabel('Ask about the selected position').boundingBox()
-    assert.ok(board.width >= 600, 'Laptop board prioritizes large, readable squares')
+    assert.ok(
+      board.width >= 500 && board.width <= 560,
+      'Laptop board balances readable squares and screen space',
+    )
     assert.ok(Math.abs(board.width - board.height) < 1, 'Board remains square')
     assert.ok(composer.y + composer.height <= 768, 'Composer fits laptop height')
     assert.match(await page.getByLabel('Material count').innerText(), /White 39 · Black 39/)

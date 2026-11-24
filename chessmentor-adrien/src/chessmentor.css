@@ -1544,7 +1544,7 @@ a {
     margin-bottom: 5px;
   }
   .game-workspace {
-    grid-template-columns: minmax(0, clamp(480px, calc(150dvh - 510px), 900px)) minmax(310px, 1fr);
+    grid-template-columns: minmax(0, clamp(408px, calc(127.5dvh - 433.5px), 765px)) minmax(310px, 1fr);
     gap: 24px;
     justify-content: center;
   }
