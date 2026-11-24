@@ -451,19 +451,26 @@ try {
       fullPage: true,
     })
   })
-  await check('laptop layout keeps the board, navigation and composer visible', async () => {
+  await check('laptop layout has a large board, visible composer and reachable navigation', async () => {
     await page.setViewportSize({ width: 1366, height: 768 })
     await page.goto(browserGameUrl)
     await page.getByLabel('Ask about the selected position').waitFor()
-    const navigation = await page.locator('.move-navigation').boundingBox()
+    const board = await page.locator('.board-section .chessboard').boundingBox()
     const composer = await page.getByLabel('Ask about the selected position').boundingBox()
-    assert.ok(navigation.y + navigation.height <= 768, 'Move navigation fits laptop height')
+    assert.ok(board.width >= 600, 'Laptop board prioritizes large, readable squares')
+    assert.ok(Math.abs(board.width - board.height) < 1, 'Board remains square')
     assert.ok(composer.y + composer.height <= 768, 'Composer fits laptop height')
     assert.match(await page.getByLabel('Material count').innerText(), /White 39 · Black 39/)
     await page.screenshot({
-      path: resolve(root, 'test-results/screenshots/compact-laptop.png'),
+      path: resolve(root, 'test-results/screenshots/large-laptop.png'),
       fullPage: true,
     })
+    await page.locator('.move-navigation').scrollIntoViewIfNeeded()
+    const navigation = await page.locator('.move-navigation').boundingBox()
+    assert.ok(
+      navigation.y >= 0 && navigation.y + navigation.height <= 768,
+      'Move navigation remains reachable by scrolling',
+    )
   })
   await check(
     'traversing to the latest move restores live interaction and annotations clear without deleting messages',
