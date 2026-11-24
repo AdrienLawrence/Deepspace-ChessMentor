@@ -1,0 +1,9 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+.prerender-test-*/
+.wrangler/
+.deepspace/
+.dev.vars*
+*.log

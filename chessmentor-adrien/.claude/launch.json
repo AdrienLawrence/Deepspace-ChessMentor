@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chessmentor-adrien",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "deepspace",
+        "dev",
+        "start",
+        "--port",
+        "5173"
+      ],
+      "port": 5173
+    }
+  ]
+}
