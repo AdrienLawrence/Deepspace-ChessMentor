@@ -1,4 +1,12 @@
+/**
+ * Owner-only dashboard for saved request traces and usage counters.
+ * The diagnostics server action is in src/actions/index.ts; worker.ts reads storage.
+ * src/chess/telemetry.ts owns trace types and aggregation; viewing this page does not call AI.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react'
+// Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
+// Public signatures: node_modules/deepspace/dist/index.d.ts.
 import { getAuthToken } from 'deepspace'
 import { RefreshCw, Activity } from 'lucide-react'
 import {
@@ -9,12 +17,15 @@ import {
 import '../../../diagnostics.css'
 
 const number = (value: number) => value.toLocaleString()
+
 const seconds = (value: number | null) => (value === null ? '—' : `${(value / 1000).toFixed(1)}s`)
+
 function stateOf(trace: RequestTrace, now: number) {
   return trace.outcome === 'running' && now - trace.startedAt >= 120000
     ? 'incomplete'
     : trace.outcome
 }
+
 export default function Diagnostics() {
   const [snapshot, setSnapshot] = useState<TelemetrySnapshot | null>(null)
   const [error, setError] = useState('')
@@ -30,35 +41,44 @@ export default function Diagnostics() {
   const controller = useRef<AbortController | null>(null)
   const refresh = useCallback(async () => {
     if (pending.current) return
+
     pending.current = true
     const abort = new AbortController()
     controller.current = abort
     setLoading(true)
+
     try {
       const token = await getAuthToken()
+
       if (!token) throw new Error('Sign in as the app owner to view diagnostics.')
+
       const response = await fetch('/api/actions/diagnostics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: '{}',
         signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
       })
+
       if (!response.headers.get('Content-Type')?.includes('application/json'))
         throw new Error('Diagnostics could not load. Try refreshing shortly.')
+
       const result = (await response.json()) as {
         success: boolean
         data: TelemetrySnapshot
         status?: number
         error?: string
       }
+
       if (!response.ok || !result.success) {
         if (response.status === 403 || result.status === 403) {
           setDenied(true)
           setAutomatic(false)
           setSnapshot(null)
         }
+
         throw new Error(result.error || 'Diagnostics could not load. Try refreshing.')
       }
+
       setSnapshot(result.data)
       setError('')
     } catch (e) {
@@ -66,18 +86,22 @@ export default function Diagnostics() {
         setError(e instanceof Error ? e.message : 'Diagnostics could not load.')
     } finally {
       pending.current = false
+
       if (!abort.signal.aborted) setLoading(false)
     }
   }, [])
   useEffect(() => {
     void refresh()
+
     return () => controller.current?.abort()
   }, [refresh])
   useEffect(() => {
     if (!automatic || denied) return
+
     const timer = window.setInterval(() => {
       if (!document.hidden) void refresh()
     }, 30000)
+
     return () => window.clearInterval(timer)
   }, [automatic, denied, refresh])
   const now = snapshot?.collectedAt ?? Date.now()
@@ -90,17 +114,20 @@ export default function Diagnostics() {
   )
   const metrics = summarizeTraces(traces, now)
   const errors = new Map<string, number>()
+
   for (const trace of traces)
     for (const step of trace.events)
       if (step.stage === 'operation.failed') {
         const code = String(step.fields.code ?? 'unknown')
         errors.set(code, (errors.get(code) ?? 0) + 1)
       }
+
   const buckets = Array.from({ length: 12 }, (_, i) => {
     const from = now - hours * 3600000 + ((hours * 3600000) / 12) * i
     const values = traces.filter(
       (t) => t.startedAt >= from && t.startedAt < from + (hours * 3600000) / 12,
     )
+
     return {
       from,
       success: values.filter((t) => t.outcome === 'completed').length,
@@ -108,6 +135,7 @@ export default function Diagnostics() {
     }
   })
   const peak = Math.max(1, ...buckets.map((b) => b.success + b.failed))
+
   return (
     <div className="diagnostics-page">
       <header className="diagnostics-header">

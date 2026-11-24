@@ -1,7 +1,14 @@
+/**
+ * Render saved coaching history and manage the question composer.
+ * src/chess/conversation.ts merges chat and move reflections into one timeline.
+ * GameWorkspace.tsx supplies onAsk for server requests and onSelect for historical navigation.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import { Send, Sparkles, MessageCircle, RotateCcw } from 'lucide-react'
 import type { Annotation, Message, Feedback, Row } from '../../chess/types'
 import { coachingTimeline } from '../../chess/conversation'
+
 interface Props {
   messages: Row<Message>[]
   feedback: Row<Feedback>[]
@@ -14,6 +21,7 @@ interface Props {
   onAsk: (question: string, requestId: string, ply: number, fen?: string) => Promise<boolean>
   onSelect: (ply: number, annotations: Annotation[], id: string) => void
 }
+
 export function MentorPanel({
   messages,
   feedback,
@@ -27,6 +35,7 @@ export function MentorPanel({
   onSelect,
 }: Props) {
   const [question, setQuestion] = useState('')
+  // Keep the same request ID on failure; service.ts uses it to deduplicate saved answers.
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   const sending = useRef(false)
   const retryPly = useRef<number | null>(null)
@@ -41,10 +50,13 @@ export function MentorPanel({
     // Scroll only the conversation, never its page ancestors (especially on mobile).
     if (messageList.current) messageList.current.scrollTop = messageList.current.scrollHeight
   }, [contentVersion, locked])
+
   async function send(text: string, turnId: string, targetPly: number, fen?: string) {
     if (sending.current || busy || savingMove || previewingBranch) return false
+
     sending.current = true
     setSubmitting(true)
+
     try {
       return await onAsk(text, turnId, targetPly, fen)
     } finally {
@@ -52,11 +64,15 @@ export function MentorPanel({
       setSubmitting(false)
     }
   }
+
   async function submit() {
     if (!question.trim() || locked || sending.current) return
+
     const draft = question
     const targetPly = retryPly.current ?? ply
+    // Clear immediately, but restore both text and target ply if submission fails.
     setQuestion('')
+
     if (await send(draft, requestId, targetPly)) {
       setRequestId(crypto.randomUUID())
       retryPly.current = null
@@ -65,6 +81,7 @@ export function MentorPanel({
       setQuestion(draft)
     }
   }
+
   return (
     <aside className="mentor-panel">
       <header className="mentor-heading">
@@ -142,6 +159,7 @@ export function MentorPanel({
                   const q = messages.find(
                     (q) => q.data.requestId === m.data.requestId && q.data.role === 'player',
                   )
+
                   if (q)
                     void send(
                       q.data.content,

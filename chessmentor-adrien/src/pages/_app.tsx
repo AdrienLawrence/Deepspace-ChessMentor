@@ -30,7 +30,13 @@ export default function App() {
             present on every page (static and dynamic). Don't rename without
             updating templates/tests. */}
         <div data-testid="app-root" className="min-h-screen bg-background text-foreground">
-          <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>}>
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center min-h-screen text-muted-foreground">
+                Loading...
+              </div>
+            }
+          >
             <Outlet />
           </Suspense>
         </div>
@@ -47,6 +53,7 @@ export default function App() {
  */
 export function Catch() {
   const error = useRouteError()
+
   return <ErrorScreen error={error} />
 }
 

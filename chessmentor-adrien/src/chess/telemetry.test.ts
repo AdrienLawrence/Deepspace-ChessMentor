@@ -10,6 +10,7 @@ import {
   type TelemetryStorage,
   type RequestTrace,
 } from './telemetry'
+
 class Memory implements TelemetryStorage {
   values = new Map<string, unknown>()
   async put<T>(key: string, value: T) {
@@ -19,15 +20,19 @@ class Memory implements TelemetryStorage {
     let entries = [...this.values]
       .filter(([key]) => key.startsWith(options.prefix))
       .sort(([a], [b]) => a.localeCompare(b))
+
     if (options.reverse) entries.reverse()
     if (options.limit) entries = entries.slice(0, options.limit)
+
     return new Map(entries) as Map<string, T>
   }
   async delete(keys: string[]) {
     keys.forEach((key) => this.values.delete(key))
+
     return keys.length
   }
 }
+
 describe('private dashboard telemetry', () => {
   it('restricts diagnostics to the exact configured owner, failing closed without configuration', () => {
     expect(isDiagnosticsOwner('owner', 'owner')).toBe(true)
@@ -38,6 +43,7 @@ describe('private dashboard telemetry', () => {
   })
   it('keeps only bounded metadata, never arbitrary fields', () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => {})
+
     try {
       const trace = createRequestTrace('trace-1', 100)
       trace.emit('model.start', {
@@ -47,7 +53,9 @@ describe('private dashboard telemetry', () => {
         durationMs: Infinity,
       })
       expect(trace.record.events[0].fields).toEqual({ model: 'test' })
+
       for (let i = 0; i < 70; i++) trace.emit('storage.complete', { durationMs: i })
+
       trace.emit('operation.complete', { operation: 'ask' })
       expect(trace.record.events).toHaveLength(60)
       expect(trace.record.truncated).toBe(true)
@@ -58,13 +66,15 @@ describe('private dashboard telemetry', () => {
     }
   })
   it('persists across readers, updates the same trace and bounds retention without touching game keys', async () => {
-    const storage = new Memory(),
-      now = Date.now()
+    const storage = new Memory()
+    const now = Date.now()
     await storage.put('chess-rate:owner', [now])
+
     for (let i = 0; i < TRACE_LIMIT + 2; i++) {
       const trace = createRequestTrace(`id-${i}`, now - i).record
       await storage.put(`chess-telemetry:${trace.startedAt}:id-${i}`, trace)
     }
+
     const current = createRequestTrace('new', now + 1).record
     await saveTrace(storage, current, now)
     expect((await readTraces(storage, now)).traces).toHaveLength(TRACE_LIMIT)

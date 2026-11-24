@@ -1,7 +1,9 @@
 import * as React from 'react'
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/select in node_modules.
 import { Select as SelectPrimitive } from '@base-ui/react/select'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 const SelectGroup = SelectPrimitive.Group
@@ -26,16 +28,22 @@ const SelectGroup = SelectPrimitive.Group
  * cleared/no-selection state (Base UI reports `null`; this wrapper coerces
  * it to `''`), so an `<SelectItem value="">` would render as the placeholder.
  */
-function collectItems(node: React.ReactNode, acc: Record<string, React.ReactNode>): Record<string, React.ReactNode> {
+function collectItems(
+  node: React.ReactNode,
+  acc: Record<string, React.ReactNode>,
+): Record<string, React.ReactNode> {
   React.Children.forEach(node, (child) => {
     if (!React.isValidElement(child)) return
+
     const props = child.props as { value?: string; children?: React.ReactNode }
+
     if (child.type === SelectItem && props.value !== undefined) {
       acc[props.value] = props.children
     } else if (props.children) {
       collectItems(props.children, acc)
     }
   })
+
   return acc
 }
 
@@ -51,12 +59,16 @@ function Select({
   children,
   items,
   ...props
-}: Omit<SelectPrimitive.Root.Props<string, false>, 'value' | 'defaultValue' | 'onValueChange' | 'multiple'> & {
+}: Omit<
+  SelectPrimitive.Root.Props<string, false>,
+  'value' | 'defaultValue' | 'onValueChange' | 'multiple'
+> & {
   value?: string
   defaultValue?: string
   onValueChange?: (value: string) => void
 }) {
   const derivedItems = React.useMemo(() => items ?? collectItems(children, {}), [items, children])
+
   return (
     <SelectPrimitive.Root
       value={value}
@@ -95,11 +107,7 @@ function SelectValue({
   )
 }
 
-function SelectTrigger({
-  className,
-  children,
-  ...props
-}: SelectPrimitive.Trigger.Props) {
+function SelectTrigger({ className, children, ...props }: SelectPrimitive.Trigger.Props) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"

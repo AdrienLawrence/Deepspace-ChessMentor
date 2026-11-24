@@ -1,5 +1,7 @@
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/avatar in node_modules.
 import { Avatar as AvatarPrimitive } from '@base-ui/react/avatar'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 /**

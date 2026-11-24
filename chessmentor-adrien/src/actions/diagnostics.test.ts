@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { actions } from './index'
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import type { ActionContext } from 'deepspace/worker'
 import type { Env } from '../../worker'
+
 describe('diagnostics action authorization', () => {
   it('does not contact storage for other users even if they supply an owner ID', async () => {
     const get = vi.fn()

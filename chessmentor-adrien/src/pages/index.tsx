@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Sparkles, MessageCircle, BookOpen, ShieldCheck } from 'lucide-react'
 import { Seo } from '../components/Seo'
 import { seo } from '../seo'
+
 export default function Landing() {
   return (
     <>

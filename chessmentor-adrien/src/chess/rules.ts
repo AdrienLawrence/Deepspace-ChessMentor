@@ -1,4 +1,11 @@
+/**
+ * Shared, synchronous game transitions used by the server and optimistic UI previews.
+ * The chess.js package owns move legality, FEN/SAN parsing and draw/checkmate detection.
+ * This file adds ChessMentor revisions, history and branching; service.ts saves the results.
+ */
+
 import { ChessError } from './errors'
+// Chess rules and notation are implemented by the chess.js dependency (node_modules/chess.js).
 import { Chess, DEFAULT_POSITION } from 'chess.js'
 import type { Game, Color } from './types'
 
@@ -15,25 +22,37 @@ export function newGame(playerId: string, playerColor: Color, automaticFeedback:
     version: 0,
   }
 }
+
+/** Read a historical FEN without changing the saved game. Ply zero is the starting position. */
 export function positionAt(game: Game, ply: number): string {
   if (!Number.isInteger(ply) || ply < 0 || ply > game.moveHistory.length)
     throw new ChessError('That position does not exist.')
+
   return ply === 0 ? DEFAULT_POSITION : game.moveHistory[ply - 1].after
 }
+
+/** Replay the complete move history so chess.js can detect repetition, not just the final FEN. */
 export function replay(game: Game): Chess {
   const chess = new Chess()
+
   for (const move of game.moveHistory) chess.move(move.san)
+
   if (chess.fen() !== game.currentFen) throw new ChessError('Game history is inconsistent.')
+
   return chess
 }
+
 export function assertRevision(game: Game, version: number) {
   if (game.status !== 'active') throw new ChessError('This game has ended.')
   if (game.version !== version)
     throw new ChessError('The position changed. Return to Live and try again.')
 }
+
+/** Translate chess.js terminal-state checks into the game result stored by ChessMentor. */
 export function outcome(chess: Chess): Pick<Game, 'status' | 'result' | 'reason'> {
   if (chess.isCheckmate())
     return { status: 'finished', result: chess.turn() === 'w' ? '0-1' : '1-0', reason: 'Checkmate' }
+
   const reason = chess.isStalemate()
     ? 'Stalemate'
     : chess.isInsufficientMaterial()
@@ -43,10 +62,13 @@ export function outcome(chess: Chess): Pick<Game, 'status' | 'result' | 'reason'
         : chess.isDrawByFiftyMoves()
           ? 'Fifty-move rule'
           : ''
+
   return reason
     ? { status: 'finished', result: '1/2-1/2', reason }
     : { status: 'active', result: '*', reason: '' }
 }
+
+/** Return a validated next revision. Persistence belongs to service.ts, not this helper. */
 export function commitMove(
   game: Game,
   version: number,
@@ -55,15 +77,19 @@ export function commitMove(
 ): Game {
   assertRevision(game, version)
   const chess = replay(game)
+
   if ((chess.turn() === game.playerColor) !== (actor === 'player'))
     throw new ChessError('It is not your turn.')
   if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(uci)) throw new ChessError('Invalid move notation.')
+
   let move
+
   try {
     move = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] })
   } catch {
     throw new ChessError('That move is not legal. Choose a legal destination and promotion piece.')
   }
+
   return {
     ...game,
     ...outcome(chess),
@@ -84,8 +110,10 @@ export function commitMove(
     ],
   }
 }
+
 export function resign(game: Game, version: number): Game {
   assertRevision(game, version)
+
   return {
     ...game,
     status: 'finished',
@@ -94,6 +122,8 @@ export function resign(game: Game, version: number): Game {
     version: game.version + 1,
   }
 }
+
+/** Copy the historical prefix and apply an alternative move; the source game is unchanged. */
 export function branchGame(
   game: Game,
   parentGameId: string,
@@ -105,6 +135,7 @@ export function branchGame(
   if (positionAt(game, ply) !== fen) throw new ChessError('The branch refers to a different board.')
   if (game.moveHistory[ply].uci === uci)
     throw new ChessError('Choose a different next move for your branch.')
+
   const prefix = {
     ...game,
     currentFen: fen,
@@ -113,11 +144,15 @@ export function branchGame(
   }
   const chess = replay(prefix)
   const start = { ...prefix, ...outcome(chess), parentGameId, branchPly: ply }
+
   return commitMove(start, ply, uci, chess.turn() === game.playerColor ? 'player' : 'opponent')
 }
+
+/** Build the bounded board facts sent to ai.ts by service.ts for this selected ply. */
 export function chessContext(game: Game, ply: number) {
   const fen = positionAt(game, ply)
   const chess = new Chess(fen)
+
   return {
     livePosition: game.status === 'active' && ply === game.moveHistory.length,
     gameStatus: game.status,
@@ -135,11 +170,15 @@ export function chessContext(game: Game, ply: number) {
   }
 }
 
+/** Describe alternatives before a committed move, for accurate automatic feedback. */
 export function reviewedMoveContext(game: Game, ply: number) {
   const move = game.moveHistory[ply - 1]
+
   if (!move) throw new ChessError('That move does not exist.')
+
   const before = new Chess(move.before)
   // SAN is sufficient for feedback and keeps the added input small.
   const legalAlternatives = before.moves()
+
   return { move, wasOnlyLegalMove: legalAlternatives.length === 1, legalAlternatives }
 }

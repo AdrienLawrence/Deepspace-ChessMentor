@@ -5,7 +5,10 @@
  * here: specific API and WebSocket handlers must precede the SPA fallback.
  */
 
+// Hono (node_modules/hono) owns HTTP routing; src/server modules register app policies.
 import { Hono } from 'hono'
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import {
   armCronRoom,
   CanvasRoom,
@@ -17,6 +20,8 @@ import {
   YjsRoom,
 } from 'deepspace/worker'
 import type { DOBindings, DOManifest, Job, JobContext } from 'deepspace/worker'
+// SDK collection contracts and built-in schema definitions: node_modules/deepspace/dist/schema.js.
+// Public signatures: node_modules/deepspace/dist/schema.d.ts.
 import { AI_CHATS_SCHEMA } from 'deepspace/schema'
 import { registerAgent } from './src/ai/agent.js'
 import { buildTools } from './src/ai/tools.js'
@@ -78,6 +83,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
         Number(request.headers.get('X-Chess-Session-Expires')) * 1000,
         Date.now() + 15 * 60_000,
       )
+
       if (!userId || !Number.isFinite(expires) || expires <= Date.now())
         return new Response('Unauthorized', { status: 401 })
       if (
@@ -88,21 +94,29 @@ export class AppRecordRoom extends RecordRoom<Env> {
           status: 429,
           headers: { 'Retry-After': '30' },
         })
+
+      // DeepSpace RecordRoom owns the handshake and record subscriptions.
+      // This override adds ChessMentor connection limits and expiry metadata.
       const response = await super.fetch(request)
+
       // Only shorten existing same-user grants; concurrent handshakes cannot extend one.
       for (const ws of this.chessState.getWebSockets()) {
         const attachment = ws.deserializeAttachment()
+
         if (attachment?.userId === userId)
           ws.serializeAttachment({
             ...attachment,
             chessExpires: Math.min(attachment.chessExpires ?? expires, expires),
           })
       }
+
       const expiries = this.chessState
         .getWebSockets()
         .map((ws) => ws.deserializeAttachment()?.chessExpires)
         .filter(Number.isFinite)
+
       if (expiries.length) await this.chessState.storage.setAlarm(Math.min(...expiries))
+
       return response
     }
     if (new URL(request.url).pathname === '/internal/chess-diagnostics') {
@@ -114,6 +128,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
           { success: false, error: 'Only the app owner can view diagnostics.', status: 403 },
           { status: 403 },
         )
+
       return Response.json({
         success: true,
         data: {
@@ -124,11 +139,14 @@ export class AppRecordRoom extends RecordRoom<Env> {
       })
     }
     if (new URL(request.url).pathname !== '/internal/chess') return super.fetch(request)
+
     // This path is never routed from the public Worker. Only the authenticated
     // chess server action constructs this internal request.
     const userId = request.headers.get('X-User-Id')
+
     if (!userId || request.headers.get('X-App-Action') !== 'true')
       return new Response('Unauthorized', { status: 401 })
+
     const receivedTrace = request.headers.get('X-Chess-Trace')
     const traceId =
       receivedTrace && /^[a-f0-9-]{36}$/.test(receivedTrace) ? receivedTrace : crypto.randomUUID()
@@ -143,6 +161,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
       }
     }
     let operation = 'invalid'
+
     try {
       await admitRequest(this.chessState.storage, userId)
       const command = commandSchema.parse(await request.json())
@@ -151,6 +170,8 @@ export class AppRecordRoom extends RecordRoom<Env> {
       await persist()
       const data = await this.chessQueue.run(userId, async () => {
         emit('queue.ready', { operation, waitMs: Date.now() - started })
+        // Adapt the SDK's internal record-tool API into service.ts's small Store interface.
+        // super.fetch resolves to RecordRoom in node_modules/deepspace/dist/worker.js.
         const exec = async (tool: string, params: Record<string, unknown>, missing = false) => {
           const storeStarted = Date.now()
           const response = await super.fetch(
@@ -174,12 +195,17 @@ export class AppRecordRoom extends RecordRoom<Env> {
             durationMs: Date.now() - storeStarted,
             success: value.success,
           })
+
           if (!value.success) {
             if (missing && value.error?.startsWith('Record not found')) return null
+
             throw new Error(value.error || 'Could not save your data.')
           }
+
           return value.data
         }
+        // These writes are privileged. executeChess in src/chess/service.ts is
+        // responsible for validating the command and checking game ownership.
         const store: Store = {
           get: async <T>(collection: string, recordId: string) =>
             ((await exec('records.get', { collection, recordId }, true))
@@ -187,6 +213,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
           put: async (collection, recordId, data) => {
             if (collection === 'games' && (command.op === 'create' || command.op === 'branch'))
               await admitCreation(this.chessState.storage, userId)
+
             await exec('records.create', { collection, recordId, data })
           },
           query: async <T>(collection: string, where: Record<string, unknown>, limit: number) =>
@@ -200,13 +227,17 @@ export class AppRecordRoom extends RecordRoom<Env> {
               })
             )?.records as Row<T>[]) ?? [],
         }
+        // ai.ts owns provider I/O; limits.ts reserves each attempt before that I/O.
+        // Injecting the wrapped function also covers retries initiated by service.ts.
         const provider = modelCall(this.chessEnv, traceId, emit)
+
         return executeChess(
           userId,
           command,
           store,
           async (...args) => {
             const release = await reserveModel(this.chessState.storage, userId, this.chessEnv)
+
             try {
               return await provider(...args)
             } finally {
@@ -218,6 +249,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
       })
       emit('operation.complete', { operation, durationMs: Date.now() - started })
       await persist()
+
       return Response.json({ success: true, data, traceId })
     } catch (error) {
       const code =
@@ -242,6 +274,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
               : 500
       emit('operation.failed', { operation, code, durationMs: Date.now() - started }, true)
       await persist()
+
       return Response.json(
         {
           success: false,
@@ -267,6 +300,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
 
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     const attachment = ws.deserializeAttachment()
+
     if (
       !attachment?.chessExpires ||
       attachment.chessExpires <= Date.now() ||
@@ -276,8 +310,10 @@ export class AppRecordRoom extends RecordRoom<Env> {
         .includes(attachment.userId)
     ) {
       ws.close(1008, 'Session refresh required')
+
       return
     }
+
     const now = Date.now()
     const window =
       attachment.chessWindow?.start > now - 60_000
@@ -285,19 +321,25 @@ export class AppRecordRoom extends RecordRoom<Env> {
         : { start: now, count: 0 }
     window.count++
     ws.serializeAttachment({ ...attachment, chessWindow: window })
+
     if (message === 'ping' && window.count <= 120) {
       ws.send('pong')
+
       return
     }
+
     const safe = safeSocketMessage(message)
+
     if (!safe || window.count > 120) {
       securityEvent(!safe ? 'socket_frame_denied' : 'socket_rate_limited', {
         route: 'realtime',
         status: 429,
       })
       ws.close(1008, 'Connection request limit exceeded')
+
       return
     }
+
     await super.webSocketMessage(ws, safe)
   }
 
@@ -308,17 +350,22 @@ export class AppRecordRoom extends RecordRoom<Env> {
 
   async alarm() {
     const remaining: number[] = []
+
     for (const ws of this.chessState.getWebSockets()) {
       const expires = ws.deserializeAttachment()?.chessExpires
+
       if (!expires || expires <= Date.now()) ws.close(1008, 'Session refresh required')
       else remaining.push(expires)
     }
+
     if (remaining.length) await this.chessState.storage.setAlarm(Math.min(...remaining))
   }
 }
 
 export class AppYjsRoom extends YjsRoom<Env> {}
+
 export class AppCanvasRoom extends CanvasRoom<Env> {}
+
 export class AppPresenceRoom extends PresenceRoom<Env> {}
 
 /** Runs the scheduled tasks defined in src/cron.ts. */
@@ -338,7 +385,9 @@ export class AppJobRoom extends JobRoom<Env> {
     super(state, env, {
       authorizeWrite: async (user) => {
         if (user.userId.startsWith('anon-')) return false
+
         const role = await resolveAppRole(env, user.userId)
+
         return role === 'member' || role === 'admin'
       },
     })
@@ -395,7 +444,9 @@ export interface Env extends DOBindings<typeof __DO_MANIFEST__> {
 export type AppContext = { Bindings: Env }
 
 const app = new Hono<AppContext>()
+
 registerSecurity(app)
+
 // A Durable Object exists only once something fetches it, and the CronRoom
 // arms its alarm in that first fetch — so wake it from the request path, or a
 // deployed schedule waits for a visitor. Once per isolate; no-op without tasks.
@@ -407,16 +458,22 @@ app.use('*', async (c, next) => {
 // Registration order is part of the worker contract. The wildcard auth route
 // follows its special cases, AI precedes platform proxies, and static is last.
 registerAuthAndIntegrationRoutes(app)
+
 registerRealtimeRoutes(app)
+
 registerActionRoutes(app, resolveAuth)
-// Every scaffold exposes selected tools through HTTP, MCP and browser tools.
-// Only copilot owns the collections needed for the in-app chat UI.
+
+// Owner tooling is implemented in src/ai/agent.ts and src/ai/tools.ts.
+// The generic SDK chat surface is separate from the custom chess mentor:
+// MentorPanel -> chess/client.ts -> chess/service.ts -> chess/ai.ts.
 registerAgent(app, {
   tools: buildTools,
   authorize: ({ userId, env }) => userId === env.OWNER_USER_ID,
   inApp: schemas.some((schema) => schema.name === AI_CHATS_SCHEMA.name),
 })
+
 registerPlatformProxyRoutes(app)
+
 registerStaticRoutes(app)
 
 export default app

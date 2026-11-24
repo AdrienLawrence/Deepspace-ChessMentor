@@ -15,6 +15,8 @@
  * persisted to `~/.deepspace/playwright-states/`), context creation, and
  * cleanup. No need to manage browser contexts manually.
  */
+// SDK Playwright fixtures and account helpers: node_modules/deepspace/dist/testing.js.
+// Public signatures: node_modules/deepspace/dist/testing.d.ts.
 import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
 
 // A machine that has never created test accounts is the normal state of a
@@ -24,6 +26,7 @@ import { test, expect, loadAllTestAccounts } from 'deepspace/testing'
 // pool is global per developer, but passwords live only on the machine that
 // created the account.
 const usableTestAccounts = loadAllTestAccounts().length
+
 test.skip(
   usableTestAccounts < 2,
   `Needs 2 usable test accounts, found ${usableTestAccounts}. Create them with ` +
@@ -69,12 +72,14 @@ test('API status page renders loading success and error states', async ({ users 
 
   await user.page.route('**/api/integrations', async (route) => {
     requestCount += 1
+
     if (shouldFail) {
       await route.fulfill({
         status: 502,
         contentType: 'application/json',
         body: JSON.stringify({ success: false, error: 'Catalog unavailable' }),
       })
+
       return
     }
 
@@ -82,7 +87,10 @@ test('API status page renders loading success and error states', async ({ users 
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: { integrations: { openai: {}, wikipedia: {} } } }),
+      body: JSON.stringify({
+        success: true,
+        data: { integrations: { openai: {}, wikipedia: {} } },
+      }),
     })
   })
 

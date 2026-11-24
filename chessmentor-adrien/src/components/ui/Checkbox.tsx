@@ -1,13 +1,17 @@
 import { useState } from 'react'
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/checkbox in node_modules.
 import { Checkbox as CheckboxPrimitive } from '@base-ui/react/checkbox'
 import { Check, Minus } from 'lucide-react'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 type CheckedState = boolean | 'indeterminate'
 
-interface CheckboxProps
-  extends Omit<CheckboxPrimitive.Root.Props, 'checked' | 'defaultChecked' | 'onCheckedChange' | 'indeterminate'> {
+interface CheckboxProps extends Omit<
+  CheckboxPrimitive.Root.Props,
+  'checked' | 'defaultChecked' | 'onCheckedChange' | 'indeterminate'
+> {
   checked?: CheckedState
   defaultChecked?: CheckedState
   onCheckedChange?: (checked: boolean) => void
@@ -20,7 +24,13 @@ interface CheckboxProps
  * accepts `'indeterminate'`, mapping it onto Base UI's separate `indeterminate`
  * flag.
  */
-function Checkbox({ className, checked, defaultChecked, onCheckedChange, ...props }: CheckboxProps) {
+function Checkbox({
+  className,
+  checked,
+  defaultChecked,
+  onCheckedChange,
+  ...props
+}: CheckboxProps) {
   // Mixed state, both modes (Radix semantics): controlled comes straight from
   // `checked`; uncontrolled starts mixed via `defaultChecked="indeterminate"`
   // and clears on the first user toggle. Deriving it from `checked` alone
@@ -30,6 +40,7 @@ function Checkbox({ className, checked, defaultChecked, onCheckedChange, ...prop
   )
   const indeterminate =
     checked !== undefined ? checked === 'indeterminate' : uncontrolledIndeterminate
+
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"

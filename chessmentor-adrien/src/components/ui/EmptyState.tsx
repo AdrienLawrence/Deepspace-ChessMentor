@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react'
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 import { Button } from './Button'
 
@@ -35,9 +36,7 @@ export function EmptyState({
         </div>
       )}
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      {description && (
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
-      )}
+      {description && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>}
       {(action || secondaryAction) && (
         <div className="mt-5 flex items-center gap-2">
           {action && <Button onClick={action.onClick}>{action.label}</Button>}

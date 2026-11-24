@@ -1,6 +1,14 @@
+/**
+ * Shared chess data contracts and runtime validation schemas.
+ * Zod owns parsing and validation; types inferred here are shared by UI and server.
+ * Database columns and collection permissions are defined separately in src/schemas/chess-schema.ts.
+ */
+
+// Zod's parser implementation lives in node_modules/zod; the app-specific schemas are below.
 import { z } from 'zod'
 
 export const squareSchema = z.string().regex(/^[a-h][1-8]$/)
+
 export const annotationSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('arrow'),
@@ -16,18 +24,26 @@ export const annotationSchema = z.discriminatedUnion('type', [
     label: z.string().max(80).optional(),
   }),
 ])
+
 export type Annotation = z.infer<typeof annotationSchema>
+
 export type Color = 'w' | 'b'
+
 export interface MoveEntry {
+  /** One half-move: White's first move is ply 1 and Black's reply is ply 2. */
   ply: number
   actor: 'player' | 'opponent'
   color: Color
+  /** Human-readable notation from chess.js, such as Nf3 or O-O. */
   san: string
+  /** Coordinate notation used by commands and the model, such as e2e4 or e7e8q. */
   uci: string
   before: string
   after: string
 }
+
 export interface Game {
+  /** Failed AI outputs retained only for the matching revision and position. */
   opponentRetry?: {
     version: number
     fen: string
@@ -38,24 +54,30 @@ export interface Game {
   playerId: string
   playerColor: Color
   automaticFeedback: boolean
+  /** Full chess.js position encoding, including side to move and castling rights. */
   currentFen: string
   moveHistory: MoveEntry[]
   status: 'active' | 'finished'
   result: '*' | '1-0' | '0-1' | '1/2-1/2'
   reason: string
+  /** Server revision used to reject stale commands; optimistic UI waits for this value. */
   version: number
 }
+
 export interface Message {
   playerId: string
   gameId: string
   role: 'player' | 'coach'
   content: string
+  /** Position selected when the question/response was created, not the current live ply. */
   linkedPly: number
   positionFen: string
   annotations: Annotation[]
   status: 'pending' | 'completed' | 'failed'
+  /** Stable across retries so service.ts can return an existing answer without duplicating it. */
   requestId: string
 }
+
 export interface Feedback {
   playerId: string
   gameId: string
@@ -64,12 +86,15 @@ export interface Feedback {
   summary: string
   annotations: Annotation[]
 }
+
+/** The subset of the SDK record envelope consumed by the chess application. */
 export interface Row<T> {
   recordId: string
   data: T
   createdAt: string
   updatedAt: string
 }
+
 export const commandSchema = z.discriminatedUnion('op', [
   z.object({
     op: z.literal('branch'),
@@ -115,4 +140,5 @@ export const commandSchema = z.discriminatedUnion('op', [
     ply: z.number().int().positive(),
   }),
 ])
+
 export type Command = z.infer<typeof commandSchema>

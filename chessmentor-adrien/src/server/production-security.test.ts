@@ -17,12 +17,16 @@ import { registerSecurity } from './security'
 import { newGame } from '../chess/rules'
 
 const { generate } = vi.hoisted(() => ({ generate: vi.fn() }))
+
 vi.mock('ai', async (importOriginal) => ({
   ...(await importOriginal<typeof import('ai')>()),
   generateText: generate,
 }))
+
 const keys = generateKeyPairSync('ec', { namedCurve: 'P-256' })
+
 const issuer = 'https://security-test.invalid'
+
 function jwt(userId: string, claims: Record<string, unknown> = {}, otherKey = false) {
   const header = Buffer.from(JSON.stringify({ alg: 'ES256', typ: 'JWT' })).toString('base64url')
   const body = Buffer.from(
@@ -36,6 +40,7 @@ function jwt(userId: string, claims: Record<string, unknown> = {}, otherKey = fa
   const privateKey = otherKey
     ? generateKeyPairSync('ec', { namedCurve: 'P-256' }).privateKey
     : keys.privateKey
+
   return `${header}.${body}.${sign('sha256', Buffer.from(`${header}.${body}`), { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`
 }
 
@@ -50,13 +55,16 @@ class MemoryStorage implements AtomicLimitStorage {
   }
   async delete(keys: string[]) {
     for (const key of keys) this.values.delete(key)
+
     return keys.length
   }
   async list<T>(options: { prefix: string; reverse?: boolean; limit?: number }) {
     let rows = [...this.values]
       .filter(([key]) => key.startsWith(options.prefix))
       .sort(([a], [b]) => a.localeCompare(b))
+
     if (options.reverse) rows.reverse()
+
     return new Map(rows.slice(0, options.limit)) as Map<string, T>
   }
   async transaction<T>(callback: (txn: LimitStorage) => Promise<T>) {
@@ -64,6 +72,7 @@ class MemoryStorage implements AtomicLimitStorage {
       .catch(() => {})
       .then(async () => {
         const snapshot = structuredClone(this.values)
+
         try {
           return await callback(this)
         } catch (error) {
@@ -72,6 +81,7 @@ class MemoryStorage implements AtomicLimitStorage {
         }
       })
     this.tail = pending
+
     return pending
   }
 }
@@ -82,6 +92,7 @@ function fixture() {
   const sql = {
     exec(query: string, ...args: (string | number | null)[]) {
       const rows = db.prepare(query).all(...args)
+
       return {
         toArray: () => rows,
         one: () => rows[0],
@@ -122,6 +133,7 @@ function fixture() {
     waitUntil: () => {},
     passThroughOnException: () => {},
   } as unknown as ExecutionContext
+
   async function request(
     path: string,
     body?: unknown,
@@ -145,6 +157,7 @@ function fixture() {
       context,
     )
   }
+
   async function tool(tool: string, params: object, user = 'owner', privileged = true) {
     const response = await room.fetch(
       new Request('https://internal/api/tools/execute', {
@@ -157,15 +170,19 @@ function fixture() {
         body: JSON.stringify({ tool, params }),
       }),
     )
+
     return response.json() as Promise<{
       success: boolean
       data?: { record?: { data: unknown }; records?: unknown[] }
       error?: string
     }>
   }
+
   return { env, room, storage, request, tool, upstream, db }
 }
+
 let f: ReturnType<typeof fixture>
+
 beforeEach(() => {
   generate.mockReset()
   vi.spyOn(console, 'info').mockImplementation(() => {})
@@ -173,6 +190,7 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   f = fixture()
 })
+
 afterEach(() => {
   f.db.close()
   vi.restoreAllMocks()
@@ -262,6 +280,7 @@ describe('production HTTP and auth boundaries (real SDK + SQLite, no network)', 
   })
   it('rejects arbitrary and unused rooms without touching a namespace', async () => {
     const get = vi.spyOn(f.env.RECORD_ROOMS, 'get')
+
     for (const path of [
       '/ws/arbitrary',
       '/ws/yjs/test',
@@ -271,6 +290,7 @@ describe('production HTTP and auth boundaries (real SDK + SQLite, no network)', 
     ]) {
       expect([401, 404]).toContain((await f.request(path, undefined, '')).status)
     }
+
     expect(get).not.toHaveBeenCalled()
   })
   it('sets privacy headers and redacts unexpected errors', async () => {
@@ -305,6 +325,7 @@ describe('production HTTP and auth boundaries (real SDK + SQLite, no network)', 
     ).toBe(false)
     const read = await f.tool('records.query', { collection: 'games' }, 'bob', false)
     expect(read.data?.records).toHaveLength(0)
+
     for (const user of ['bob', 'owner'])
       expect(
         (
@@ -316,6 +337,7 @@ describe('production HTTP and auth boundaries (real SDK + SQLite, no network)', 
           )
         ).success,
       ).toBe(false)
+
     expect(
       (
         await f.tool(
@@ -334,6 +356,7 @@ describe('production HTTP and auth boundaries (real SDK + SQLite, no network)', 
       recordId: 'alice-game',
       data: newGame('alice', 'b', true),
     })
+
     for (const command of [
       { op: 'opponent', version: 0 },
       {
@@ -352,6 +375,7 @@ describe('production HTTP and auth boundaries (real SDK + SQLite, no network)', 
       )
       expect(response.status).toBe(404)
     }
+
     expect(generate).not.toHaveBeenCalled()
   })
   it('stops at the AI daily budget and preserves saved state, with Retry-After', async () => {
@@ -508,17 +532,21 @@ describe('persistent, atomic abuse limits', () => {
       Array.from({ length: 12 }, (_, i) => reserveModel(storage, `user${i}`, {})),
     )
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(4)
+
     for (const result of results) if (result.status === 'fulfilled') await result.value()
+
     const release = await reserveModel(storage, 'new-user', {})
     await release()
   })
   it('counts failures/retries, survives a new caller and resets daily UTC windows', async () => {
-    const storage = new MemoryStorage(),
-      now = Date.UTC(2026, 10, 23, 12)
+    const storage = new MemoryStorage()
+    const now = Date.UTC(2026, 10, 23, 12)
+
     for (let i = 0; i < 2; i++) {
       const release = await reserveModel(storage, 'alice', { CHESS_AI_USER_DAILY: '2' }, now)
       await release()
     }
+
     await expect(
       reserveModel(storage, 'alice', { CHESS_AI_USER_DAILY: '2' }, now + 61_000),
     ).rejects.toMatchObject({ status: 429, code: 'usage_limit' })
@@ -542,9 +570,13 @@ describe('persistent, atomic abuse limits', () => {
   })
   it('limits requests and creations persistently', async () => {
     const storage = new MemoryStorage()
+
     for (let i = 0; i < 30; i++) await admitRequest(storage, 'alice')
+
     await expect(admitRequest(storage, 'alice')).rejects.toMatchObject({ status: 429 })
+
     for (let i = 0; i < 10; i++) await admitCreation(storage, 'alice')
+
     await expect(admitCreation(storage, 'alice')).rejects.toMatchObject({ status: 429 })
   })
 })

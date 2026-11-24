@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import { canRead, canCreate, canUpdate, canDelete } from 'deepspace/worker'
 import { executeChess, SerialQueue, type Store } from './service'
 import { parseCoaching, parseJson, type ModelCall } from './ai'
@@ -34,13 +36,15 @@ class MemoryStore implements Store {
       .slice(0, limit)
   }
 }
+
 const coaching = {
   content: 'Consider how your central pawns support your pieces.',
   annotations: [{ type: 'highlight', square: 'e4', tone: 'yellow' }],
 }
+
 async function fixture(color: 'w' | 'b' = 'w', automaticFeedback = true) {
-  const store = new MemoryStore(),
-    model = vi.fn<ModelCall>().mockResolvedValue(coaching)
+  const store = new MemoryStore()
+  const model = vi.fn<ModelCall>().mockResolvedValue(coaching)
   const created = await executeChess(
     'alice',
     { op: 'create', color, automaticFeedback, requestId: crypto.randomUUID() },
@@ -50,8 +54,10 @@ async function fixture(color: 'w' | 'b' = 'w', automaticFeedback = true) {
   const run = (command: object, userId = 'alice') =>
     executeChess(userId, { gameId: created.gameId, ...command }, store, model)
   const game = async () => (await store.get<Game>('games', created.gameId))!.data
+
   return { store, model, run, game, id: created.gameId }
 }
+
 describe('persistent operations and privacy', () => {
   it.each([
     [0, 'w'],
@@ -60,6 +66,7 @@ describe('persistent operations and privacy', () => {
     'assigns random side %s once without changing piece colors',
     async (sample, color) => {
       const random = vi.spyOn(crypto, 'getRandomValues').mockReturnValue(new Uint8Array([sample]))
+
       try {
         const store = new MemoryStore()
         const model = vi.fn<ModelCall>()
@@ -83,16 +90,16 @@ describe('persistent operations and privacy', () => {
     },
   )
   it('deduplicates creation across retries and resolves random color', async () => {
-    const store = new MemoryStore(),
-      model = vi.fn<ModelCall>(),
-      command = {
-        op: 'create',
-        color: 'random',
-        automaticFeedback: false,
-        requestId: crypto.randomUUID(),
-      }
-    const first = await executeChess('alice', command, store, model),
-      again = await executeChess('alice', command, store, model)
+    const store = new MemoryStore()
+    const model = vi.fn<ModelCall>()
+    const command = {
+      op: 'create',
+      color: 'random',
+      automaticFeedback: false,
+      requestId: crypto.randomUUID(),
+    }
+    const first = await executeChess('alice', command, store, model)
+    const again = await executeChess('alice', command, store, model)
     expect(first).toEqual(again)
     expect(store.rows.size).toBe(1)
     expect(['w', 'b']).toContain((await store.get<Game>('games', first.gameId))!.data.playerColor)
@@ -232,8 +239,8 @@ describe('persistent operations and privacy', () => {
     expect((await f.game()).moveHistory).toHaveLength(1)
   })
   it('preserves conversation context for follow-up questions', async () => {
-    const f = await fixture(),
-      fen = (await f.game()).currentFen
+    const f = await fixture()
+    const fen = (await f.game()).currentFen
     await f.run({
       op: 'ask',
       ply: 0,
@@ -259,14 +266,14 @@ describe('persistent operations and privacy', () => {
     expect(f.model).not.toHaveBeenCalled()
   })
   it('retries failed coaching without duplicating either message', async () => {
-    const f = await fixture(),
-      command = {
-        op: 'ask',
-        ply: 0,
-        fen: (await f.game()).currentFen,
-        question: 'Help?',
-        requestId: crypto.randomUUID(),
-      }
+    const f = await fixture()
+    const command = {
+      op: 'ask',
+      ply: 0,
+      fen: (await f.game()).currentFen,
+      question: 'Help?',
+      requestId: crypto.randomUUID(),
+    }
     f.model.mockRejectedValueOnce(new Error('Timeout'))
     await expect(f.run(command)).rejects.toThrow(/question is saved/)
     expect(
@@ -329,8 +336,10 @@ describe('persistent operations and privacy', () => {
       uci: 'd2d4',
       requestId: crypto.randomUUID(),
     }
+
     for (const change of [{ uci: 'e2e5' }, { uci: 'e2e4' }, { ply: 1 }, { fen: 'invalid' }])
       await expect(f.run({ ...base, ...change })).rejects.toThrow()
+
     expect(f.store.rows.size).toBe(1)
     expect(f.model).not.toHaveBeenCalled()
   })
@@ -363,8 +372,8 @@ describe('persistent operations and privacy', () => {
     })
   })
   it('serializes competing tabs so exactly one stale move is rejected', async () => {
-    const f = await fixture(),
-      queue = new SerialQueue()
+    const f = await fixture()
+    const queue = new SerialQueue()
     const results = await Promise.allSettled(
       ['e2e4', 'd2d4'].map((uci) =>
         queue.run('alice', () => f.run({ op: 'move', version: 0, uci })),
@@ -374,10 +383,11 @@ describe('persistent operations and privacy', () => {
     expect((await f.game()).version).toBe(1)
   })
   it('serializes duplicate opponent requests into one inference and one move', async () => {
-    const f = await fixture('b'),
-      queue = new SerialQueue()
+    const f = await fixture('b')
+    const queue = new SerialQueue()
     f.model.mockImplementation(async () => {
       await new Promise((r) => setTimeout(r, 5))
+
       return { uci: 'e2e4' }
     })
     await Promise.all(
@@ -387,8 +397,8 @@ describe('persistent operations and privacy', () => {
     expect((await f.game()).version).toBe(1)
   })
   it('lets another owner proceed while one owner waits, and releases failed queues', async () => {
-    const queue = new SerialQueue(),
-      events: string[] = []
+    const queue = new SerialQueue()
+    const events: string[] = []
     let release!: () => void
     const blocker = new Promise<void>((resolve) => {
       release = resolve
@@ -413,6 +423,7 @@ describe('persistent operations and privacy', () => {
   it('actual SDK policies deny private reads and all direct mutations, even for admin', () => {
     for (const schema of chessSchemas) {
       const row = { data: { playerId: 'alice' }, createdBy: 'alice' }
+
       for (const role of ['member', 'admin']) {
         expect(canRead(schema, role, row, 'alice')).toBe(true)
         expect(canRead(schema, role, row, 'bob')).toBe(false)
@@ -420,10 +431,12 @@ describe('persistent operations and privacy', () => {
         expect(canUpdate(schema, role, row, 'alice')).toBe(false)
         expect(canDelete(schema, role, row, 'alice')).toBe(false)
       }
+
       expect(canRead(schema, 'viewer', row, 'anon-guest')).toBe(false)
     }
   })
 })
+
 describe('model output trust boundary', () => {
   it('orders questions before answers when persistence timestamps tie', () => {
     const base: Message = {

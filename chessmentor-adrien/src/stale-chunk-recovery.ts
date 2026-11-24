@@ -18,12 +18,14 @@ interface RecoveryOptions {
 
 function browserRecovery(): RecoveryOptions {
   let storage: RecoveryOptions['storage'] = null
+
   try {
     storage = sessionStorage
   } catch {
     // Storage can be unavailable under hardened privacy settings. Without a
     // durable attempt marker, reloading could loop forever, so fail closed.
   }
+
   return {
     storage,
     reload: () => window.location.reload(),
@@ -33,9 +35,11 @@ function browserRecovery(): RecoveryOptions {
 
 function readReloadAttempt(storage: RecoveryOptions['storage']): boolean {
   if (!storage) return true
+
   try {
     const attempted = storage.getItem(RELOAD_KEY) === '1'
     storage.removeItem(RELOAD_KEY)
+
     return attempted
   } catch {
     return true
@@ -44,8 +48,10 @@ function readReloadAttempt(storage: RecoveryOptions['storage']): boolean {
 
 function rememberReloadAttempt(storage: RecoveryOptions['storage']): boolean {
   if (!storage) return false
+
   try {
     storage.setItem(RELOAD_KEY, '1')
+
     return true
   } catch {
     return false
@@ -70,6 +76,7 @@ export function installStaleChunkRecovery(
   onPreloadError((event) => {
     if (reloadAttempted) return
     if (!rememberReloadAttempt(storage)) return
+
     reloadAttempted = true
     event.preventDefault()
     reload()
@@ -78,6 +85,7 @@ export function installStaleChunkRecovery(
   let unsubscribe = () => {}
   const clearAfterSuccessfulRouteLoad = (state: RouterState) => {
     if (!state.initialized || state.errors) return
+
     reloadAttempted = false
     clearReloadAttempt(storage)
     unsubscribe()

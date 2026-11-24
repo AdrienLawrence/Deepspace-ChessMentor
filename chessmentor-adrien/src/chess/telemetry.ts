@@ -1,17 +1,30 @@
+/**
+ * Bounded request traces for the owner diagnostics dashboard.
+ * worker.ts supplies Durable Object storage and calls these helpers around chess actions.
+ * diagnostics.ts writes safe console events; this module also retains allowed fields
+ * for src/pages/(app)/(protected)/diagnostics.tsx. No external log drain is configured here.
+ */
+
 import { traceEvent } from './diagnostics'
 import type { UsageStatus } from './limits'
 
 export const TRACE_LIMIT = 500
+
 export const TRACE_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
 const PREFIX = 'chess-telemetry:'
+
 export type TraceFields = Record<string, string | number | boolean | undefined>
+
 export type TraceEmitter = (stage: string, fields?: TraceFields, failed?: boolean) => void
+
 export interface TraceStep {
   at: number
   stage: string
   fields: TraceFields
   failed: boolean
 }
+
 export interface RequestTrace {
   traceId: string
   startedAt: number
@@ -21,6 +34,7 @@ export interface RequestTrace {
   events: TraceStep[]
   truncated: boolean
 }
+
 export interface TelemetrySnapshot {
   usage?: UsageStatus
   credential?: { valid: boolean; expiresAt?: number }
@@ -29,11 +43,13 @@ export interface TelemetrySnapshot {
   retentionDays: number
   limit: number
 }
+
 export interface TelemetryStorage {
   put<T>(key: string, value: T): Promise<void>
   list<T>(options: { prefix: string; reverse?: boolean; limit?: number }): Promise<Map<string, T>>
   delete(keys: string[]): Promise<number>
 }
+
 const fieldsAllowed = new Set([
   'operation',
   'waitMs',
@@ -52,6 +68,8 @@ const fieldsAllowed = new Set([
   'attempt',
   'rejectedCount',
 ])
+
+/** Create one request-local emitter that both logs and accumulates allowlisted trace fields. */
 export function createRequestTrace(traceId: string, startedAt = Date.now()) {
   const record: RequestTrace = {
     traceId,
@@ -64,6 +82,7 @@ export function createRequestTrace(traceId: string, startedAt = Date.now()) {
   }
   const emit: TraceEmitter = (stage, fields = {}, failed = false) => {
     const safe: TraceFields = {}
+
     for (const [key, value] of Object.entries(fields))
       if (fieldsAllowed.has(key)) {
         if (typeof value === 'string') safe[key] = value.slice(0, 160)
@@ -73,8 +92,10 @@ export function createRequestTrace(traceId: string, startedAt = Date.now()) {
         )
           safe[key] = value
       }
+
     traceEvent(traceId, stage, safe, failed)
     record.updatedAt = Date.now()
+
     if (typeof safe.operation === 'string') record.operation = safe.operation
     if (stage === 'operation.complete') record.outcome = 'completed'
     if (stage === 'operation.failed') record.outcome = 'failed'
@@ -82,8 +103,11 @@ export function createRequestTrace(traceId: string, startedAt = Date.now()) {
       record.events.push({ at: record.updatedAt, stage, fields: safe, failed })
     else record.truncated = true
   }
+
   return { record, emit }
 }
+
+/** Persist a trace and prune records outside the retention count or age. */
 export async function saveTrace(storage: TelemetryStorage, trace: RequestTrace, now = Date.now()) {
   await storage.put(
     `${PREFIX}${trace.startedAt.toString().padStart(13, '0')}:${trace.traceId}`,
@@ -93,8 +117,11 @@ export async function saveTrace(storage: TelemetryStorage, trace: RequestTrace, 
   const remove = [...stored]
     .filter(([, r], i) => i >= TRACE_LIMIT || r.startedAt < now - TRACE_AGE_MS)
     .map(([key]) => key)
+
   if (remove.length) await storage.delete(remove)
 }
+
+/** Return retained traces to the owner diagnostics action without reading game/chat contents. */
 export async function readTraces(
   storage: TelemetryStorage,
   now = Date.now(),
@@ -104,6 +131,7 @@ export async function readTraces(
     reverse: true,
     limit: TRACE_LIMIT,
   })
+
   return {
     traces: [...stored.values()].filter((r) => r.startedAt >= now - TRACE_AGE_MS),
     collectedAt: now,
@@ -111,18 +139,24 @@ export async function readTraces(
     limit: TRACE_LIMIT,
   }
 }
+
 export function isDiagnosticsOwner(userId: string | null | undefined, ownerId: string | undefined) {
   return !!ownerId && !!userId && !userId.startsWith('anon-') && userId === ownerId
 }
+
+/** Compute dashboard statistics from retained events; these are not a billing ledger. */
 export function summarizeTraces(traces: RequestTrace[], now: number) {
   const steps = traces.flatMap((t) => t.events)
   const calls = steps.filter((e) => e.stage === 'model.start').length
   const modelTimes: number[] = []
+
   for (const trace of traces) {
     let duration: number | undefined
+
     for (const event of trace.events) {
       if (event.stage === 'model.start') {
         if (duration !== undefined) modelTimes.push(duration)
+
         duration = undefined
       }
       if (
@@ -131,8 +165,10 @@ export function summarizeTraces(traces: RequestTrace[], now: number) {
       )
         duration = event.fields.durationMs
     }
+
     if (duration !== undefined) modelTimes.push(duration)
   }
+
   modelTimes.sort((a, b) => a - b)
   const finished = traces.filter((t) => t.outcome !== 'running')
   const failures = finished.filter((t) => t.outcome === 'failed').length
@@ -142,6 +178,7 @@ export function summarizeTraces(traces: RequestTrace[], now: number) {
       (n, e) => n + (typeof e.fields[field] === 'number' ? (e.fields[field] as number) : 0),
       0,
     )
+
   return {
     requests: traces.length,
     failures,

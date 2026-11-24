@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
@@ -32,8 +33,7 @@ const buttonVariants = cva(
 )
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   loading?: boolean
 }
 
@@ -58,6 +58,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     </button>
   ),
 )
+
 Button.displayName = 'Button'
 
 export { Button, buttonVariants }

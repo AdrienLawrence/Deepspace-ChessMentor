@@ -30,6 +30,8 @@
     "test:browser": "node tests/browser-integration.mjs",
     "test:worker": "node tests/offline-integration.mjs",
     "format:chess": "prettier --write src/chess src/components/chess src/chessmentor.css src/schemas/chess-schema.ts tests/*integration.mjs",
+    "format:ts": "prettier --write \"**/*.{ts,tsx}\"",
+    "format:ts:check": "prettier --check \"**/*.{ts,tsx}\"",
     "security:check": "node scripts/security-check.mjs"
   },
   "dependencies": {

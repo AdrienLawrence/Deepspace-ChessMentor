@@ -10,6 +10,8 @@
 
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+// Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
+// Public signatures: node_modules/deepspace/dist/index.d.ts.
 import { AuthOverlay, useAuthProfileReady, signOut } from 'deepspace'
 import { ChevronDown, LogOut, Menu, X } from 'lucide-react'
 import { APP_NAME } from '../constants'
@@ -47,11 +49,13 @@ export default function Navigation() {
     if (!item.roles) return true
     if (!profileReady) return false
     if (userRole === 'admin') return true
+
     return item.roles.includes(userRole as Role)
   })
 
   const navLink = (item: (typeof nav)[number]) => {
     const active = location.pathname.startsWith(item.path)
+
     return (
       <Link
         key={item.path}
@@ -72,7 +76,8 @@ export default function Navigation() {
       <nav data-testid="app-navigation" className="border-b border-border bg-background">
         <div className="mx-auto flex h-18 max-w-7xl items-center gap-4 px-4">
           <Link to="/home" className="brand">
-            <span aria-hidden>♞</span>{APP_NAME}
+            <span aria-hidden>♞</span>
+            {APP_NAME}
           </Link>
 
           <div className="hidden items-center md:flex">{visibleNav.map(navLink)}</div>
@@ -148,7 +153,11 @@ export default function Navigation() {
             aria-label="Toggle menu"
             aria-expanded={mobileMenuOpen}
           >
-            {mobileMenuOpen ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}
+            {mobileMenuOpen ? (
+              <X className="h-4 w-4" aria-hidden />
+            ) : (
+              <Menu className="h-4 w-4" aria-hidden />
+            )}
           </button>
         </div>
 

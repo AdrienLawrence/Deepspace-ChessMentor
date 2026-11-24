@@ -36,8 +36,7 @@ const App = app.default
 function Layout() {
   return (
     <>
-      <App />{' '}
-      <></>
+      <App /> <></>
     </>
   )
 }
@@ -55,5 +54,6 @@ export function render(route: string): string {
     ],
     { initialEntries: [route] },
   )
+
   return renderToString(<RouterProvider router={router} />)
 }

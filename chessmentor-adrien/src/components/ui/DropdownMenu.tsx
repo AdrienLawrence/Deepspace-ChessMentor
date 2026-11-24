@@ -1,13 +1,19 @@
 import * as React from 'react'
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/menu in node_modules.
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 const DropdownMenu = MenuPrimitive.Root
+
 const DropdownMenuPortal = MenuPrimitive.Portal
+
 const DropdownMenuGroup = MenuPrimitive.Group
+
 const DropdownMenuRadioGroup = MenuPrimitive.RadioGroup
+
 const DropdownMenuSub = MenuPrimitive.SubmenuRoot
 
 function DropdownMenuTrigger(props: MenuPrimitive.Trigger.Props) {

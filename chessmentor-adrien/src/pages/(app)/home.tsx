@@ -1,13 +1,22 @@
+/**
+ * Saved-game dashboard. DeepSpace useQuery supplies the authenticated game list.
+ * Board thumbnails are rendered by src/components/chess/Chessboard.tsx.
+ */
+
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+// Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
+// Public signatures: node_modules/deepspace/dist/index.d.ts.
 import { AuthOverlay, useAuth, useQuery } from 'deepspace'
 import { Plus, BookOpen, Sparkles, Clock3 } from 'lucide-react'
 import type { Game } from '../../chess/types'
 import { BoardThumbnail } from '../../components/chess/Chessboard'
+
 export default function HomePage() {
   const { isSignedIn } = useAuth()
   const [auth, setAuth] = useState(false)
   const games = useQuery<Game>('games', { orderBy: 'updatedAt', orderDir: 'desc' })
+
   return (
     <div className="dashboard">
       <section className="dashboard-hero">
@@ -65,6 +74,7 @@ export default function HomePage() {
           <div className="game-grid">
             {games.records.map((row) => {
               const g = row.data
+
               return (
                 <Link
                   key={row.recordId}

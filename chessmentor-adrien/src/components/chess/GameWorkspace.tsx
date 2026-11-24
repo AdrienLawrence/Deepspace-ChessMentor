@@ -1,6 +1,16 @@
+/**
+ * Connect the subscribed game record to board, history and mentor UI.
+ * DeepSpace useQuery owns confirmed data. Local optimistic/branch state only previews it.
+ * src/chess/rules.ts computes positions; src/chess/client.ts sends commands to the server.
+ * Chessboard.tsx handles selection, MoveHistory.tsx navigation, and MentorPanel.tsx chat.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+// Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
+// Public signatures: node_modules/deepspace/dist/index.d.ts.
 import { useQuery } from 'deepspace'
+// Chess rules and notation are implemented by the chess.js dependency (node_modules/chess.js).
 import { Chess } from 'chess.js'
 import { Flag, Sparkles, BookOpen, RotateCcw, X, ChevronLeft } from 'lucide-react'
 import { Chessboard } from './Chessboard'
@@ -22,6 +32,7 @@ import {
 export default function GamePage({ analysis = false }: { analysis?: boolean }) {
   const { id = '' } = useParams()
   const games = useQuery<Game>('games', { where: { recordId: id } })
+
   if (games.status === 'error')
     return (
       <div className="page-state" role="alert">
@@ -34,7 +45,9 @@ export default function GamePage({ analysis = false }: { analysis?: boolean }) {
         Opening your board…
       </div>
     )
+
   const record = games.records[0]
+
   if (!record)
     return (
       <div className="page-state">
@@ -45,35 +58,46 @@ export default function GamePage({ analysis = false }: { analysis?: boolean }) {
         </Link>
       </div>
     )
+
   return <Workspace key={`${id}-${analysis}`} record={record} analysis={analysis} />
 }
+
 function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean }) {
   const go = useNavigate()
+
+  // The parent keeps useQuery subscribed. Preview a move only until the saved
+  // revision catches up; never write optimistic state into the SDK record cache.
   const [optimistic, setOptimistic] = useState<Game | null>(null)
   const confirmed = record.data
   const pendingMove = !!optimistic && confirmed.version < optimistic.version
-  const game = optimistic && pendingMove ? optimistic : confirmed,
-    id = record.recordId,
-    total = game.moveHistory.length
+  const game = optimistic && pendingMove ? optimistic : confirmed
+  const id = record.recordId
+  const total = game.moveHistory.length
+
+  // Saved conversation and feedback keep their own subscriptions to the same game.
   const messages = useQuery<Message>('game_messages', {
     where: { gameId: id },
     orderBy: 'createdAt',
     orderDir: 'asc',
   })
   const feedback = useQuery<Feedback>('move_feedback', { where: { gameId: id } })
+
+  // null means live; a number selects a historical ply without changing the game.
   const [viewed, setViewed] = useState<number | null>(null)
   const [selection, setSelection] = useState<{
     ply: number
     annotations: Annotation[]
     id: string
   } | null>(null)
-  const [moving, setMoving] = useState(false),
-    [thinking, setThinking] = useState(false),
-    [asking, setAsking] = useState(false)
-  const [error, setError] = useState(''),
-    [aiError, setAiError] = useState(''),
-    [feedbackError, setFeedbackError] = useState('')
+  const [moving, setMoving] = useState(false)
+  const [thinking, setThinking] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [error, setError] = useState('')
+  const [aiError, setAiError] = useState('')
+  const [feedbackError, setFeedbackError] = useState('')
   const [confirmResign, setConfirmResign] = useState(false)
+
+  // A historical move stays a draft until createBranch sends the server command.
   const [branchDraft, setBranchDraft] = useState<{
     ply: number
     fen: string
@@ -82,11 +106,15 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
     previewFen: string
   } | null>(null)
   const branchButton = useRef<HTMLButtonElement>(null)
+
   useEffect(() => {
     if (!branchDraft) return
+
     branchButton.current?.focus({ preventScroll: true })
     branchButton.current?.scrollIntoView({ block: 'nearest' })
   }, [branchDraft])
+
+  // Refs prevent duplicate submissions between renders; state drives visible feedback.
   const attempted = useRef(new Set<number>())
   const feedbackAttempts = useRef(new Set<number>())
   const feedbackInFlight = useRef(false)
@@ -95,20 +123,28 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
   const opponentLock = useRef(false)
   const [thinkingSince, setThinkingSince] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
+
+  // Confirmation comes from useQuery, not merely from the HTTP request finishing.
   useEffect(() => {
     if (optimistic && confirmed.version >= optimistic.version) setOptimistic(null)
   }, [confirmed.version, optimistic])
+
   useEffect(() => {
     if (thinkingSince === null) return
+
     const timer = window.setInterval(
       () => setElapsed(Math.floor((Date.now() - thinkingSince) / 1000)),
       1000,
     )
+
     return () => window.clearInterval(timer)
   }, [thinkingSince])
+
   const [feedbackRetry, setFeedbackRetry] = useState(0)
-  const ply = Math.min(viewed ?? total, total),
-    fen = positionAt(game, ply)
+
+  // rules.ts reconstructs the viewed position; material.ts counts the shown pieces.
+  const ply = Math.min(viewed ?? total, total)
+  const fen = positionAt(game, ply)
   const displayedFen = branchDraft?.previewFen ?? fen
   const current = new Chess(game.currentFen)
   const material = materialAt(displayedFen)
@@ -121,13 +157,18 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
     !branchDraft &&
     (branchable || (!analysis && live && game.status === 'active' && !aiTurn))
   const annotations = selection?.ply === ply ? selection.annotations : []
+
+  // chessAction in src/chess/client.ts is the transport. The server chooses and
+  // validates the opponent move in src/chess/service.ts; the UI never selects it.
   async function opponent() {
     if (opponentLock.current || pendingMove) return
+
     opponentLock.current = true
     setThinking(true)
     setThinkingSince(Date.now())
     setElapsed(0)
     setAiError('')
+
     try {
       await chessAction({ op: 'opponent', gameId: id, version: game.version })
     } catch (e) {
@@ -138,12 +179,17 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
       setThinkingSince(null)
     }
   }
+
   useEffect(() => {
     if (analysis || pendingMove || !aiTurn || attempted.current.has(game.version)) return
+
     attempted.current.add(game.version)
     void opponent()
     // The immutable revision identifies one opponent turn, including remount recovery.
   }, [id, game.version, aiTurn, analysis, pendingMove])
+
+  // Fill one missing reflection at a time. service.ts rechecks ownership and
+  // duplicate results before ai.ts makes a paid request through the provider.
   useEffect(() => {
     if (
       analysis ||
@@ -156,13 +202,16 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
       feedbackError
     )
       return
+
     const missing = game.moveHistory.find(
       (m) =>
         m.ply > (game.branchPly ?? 0) &&
         !feedback.records.some((f) => f.data.ply === m.ply) &&
         !feedbackAttempts.current.has(m.ply),
     )
+
     if (!missing) return
+
     feedbackAttempts.current.add(missing.ply)
     feedbackInFlight.current = true
     setReflecting(true)
@@ -186,10 +235,12 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
     feedbackRetry,
     feedbackError,
   ])
+
   async function move(uci: string) {
     if (moveLock.current || moving || pendingMove || branchDraft) return
     if (branchable) {
       try {
+        // Shared pure helper in src/chess/rules.ts; no branch is saved yet.
         const preview = branchGame(game, id, ply, fen, uci)
         setBranchDraft({
           ply,
@@ -203,23 +254,31 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not preview that move.')
       }
+
       return
     }
+
     let preview: Game
+
     try {
+      // Reuse the server's rules for instant feedback, then submit for authority.
       preview = commitMove(confirmed, confirmed.version, uci, 'player')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Invalid move.')
+
       return
     }
+
     moveLock.current = true
     setOptimistic(preview)
     setMoving(true)
     setError('')
     setSelection(null)
+
     try {
       await chessAction({ op: 'move', gameId: id, version: confirmed.version, uci })
     } catch (e) {
+      // The latest subscribed record becomes visible again if saving fails.
       setOptimistic(null)
       setError(e instanceof Error ? e.message : 'Could not save move.')
     } finally {
@@ -227,9 +286,11 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
       setMoving(false)
     }
   }
+
   async function ask(question: string, requestId: string, targetPly: number, targetFen?: string) {
     setAsking(true)
     setError('')
+
     try {
       await chessAction({
         op: 'ask',
@@ -239,25 +300,32 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
         ply: targetPly,
         fen: targetFen ?? positionAt(game, targetPly),
       })
+
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not send question.')
+
       return false
     } finally {
       setAsking(false)
     }
   }
+
   function navigate(p: number | null) {
     if (pendingMove || moving) return
+
     setViewed(p === total ? null : p)
     setSelection(null)
     setBranchDraft(null)
   }
+
   async function createBranch() {
     if (!branchDraft || moving || moveLock.current) return
+
     moveLock.current = true
     setMoving(true)
     setError('')
+
     try {
       const { previewFen: _preview, ...command } = branchDraft
       const created = await chessAction({ op: 'branch', gameId: id, ...command })
@@ -269,6 +337,7 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
       setMoving(false)
     }
   }
+
   const color = game.playerColor === 'w' ? 'White' : 'Black'
   const status = pendingMove
     ? 'Saving your move…'
@@ -285,6 +354,7 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
             : current.isCheck()
               ? 'Your turn · Check'
               : 'Your turn'
+
   return (
     <div className="workspace-page">
       <div className="workspace-top">
@@ -513,6 +583,7 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
           onAsk={ask}
           onSelect={(p, a, selectedId) => {
             if (pendingMove || moving) return
+
             setViewed(p === total && !analysis ? null : p)
             setBranchDraft(null)
             setSelection({ ply: p, annotations: a, id: selectedId })
@@ -539,6 +610,7 @@ function Workspace({ record, analysis }: { record: Row<Game>; analysis: boolean 
               disabled={moving}
               onClick={async () => {
                 setMoving(true)
+
                 try {
                   await chessAction({ op: 'resign', gameId: id, version: game.version })
                   setConfirmResign(false)

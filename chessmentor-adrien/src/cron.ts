@@ -26,6 +26,8 @@
  *   }
  */
 
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import type { CronTask } from 'deepspace/worker'
 
 export const tasks: CronTask[] = []

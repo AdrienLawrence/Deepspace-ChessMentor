@@ -1,4 +1,6 @@
 import { defineConfig } from '@playwright/test'
+// SDK Playwright fixtures and account helpers: node_modules/deepspace/dist/testing.js.
+// Public signatures: node_modules/deepspace/dist/testing.d.ts.
 import { chromiumLaunchOptions } from 'deepspace/testing'
 
 /**
@@ -11,6 +13,7 @@ import { chromiumLaunchOptions } from 'deepspace/testing'
  * parallel, give each one a different --port.
  */
 const PORT = Number(process.env.DEEPSPACE_PORT ?? 5173)
+
 // Use the address the test server binds to. New Chromium releases can apply
 // Local Network Access checks to top-level `localhost` navigation in an agent
 // container; the explicit loopback address keeps the browser and Vite on the

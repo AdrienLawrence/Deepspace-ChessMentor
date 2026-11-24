@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react'
 import { Search, X } from 'lucide-react'
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 import { Input } from './Input'
 

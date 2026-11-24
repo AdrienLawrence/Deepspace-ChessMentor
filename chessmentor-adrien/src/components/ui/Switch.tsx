@@ -1,5 +1,7 @@
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/switch in node_modules.
 import { Switch as SwitchPrimitive } from '@base-ui/react/switch'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 /**

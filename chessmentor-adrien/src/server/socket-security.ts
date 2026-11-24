@@ -1,4 +1,11 @@
+/**
+ * Validate and narrow browser frames before worker.ts delegates to DeepSpace RecordRoom.
+ * Zod checks subscription query shape; only the read-oriented protocol below is accepted.
+ * Connection authentication lives in realtime-routes.ts; expiry/rate enforcement is in worker.ts.
+ */
+
 import { z } from 'zod'
+
 const query = z
   .object({
     collection: z.enum(['games', 'game_messages', 'move_feedback', 'users', 'settings']),
@@ -8,7 +15,9 @@ const query = z
     limit: z.number().int().min(1).max(1000).optional(),
   })
   .passthrough()
+
 const subscription = z.object({ subscriptionId: z.string().min(1).max(200), query })
+
 /** Prevent unused Yjs/binary writes and malformed frames reaching SDK error logging. */
 export function safeSocketMessage(message: string | ArrayBuffer): string | null {
   if (
@@ -17,13 +26,18 @@ export function safeSocketMessage(message: string | ArrayBuffer): string | null 
     new TextEncoder().encode(message).byteLength > 8192
   )
     return null
+
   try {
     const frame = JSON.parse(message)
+
     if (!frame || typeof frame !== 'object' || Array.isArray(frame)) return null
     if (frame.type === 'core.subscribe') {
       const parsed = subscription.safeParse(frame.payload)
+
       if (!parsed.success) return null
+
       parsed.data.query.limit ??= 1000
+
       return JSON.stringify({ type: frame.type, payload: parsed.data })
     }
     if (frame.type === 'core.unsubscribe') {
@@ -34,6 +48,7 @@ export function safeSocketMessage(message: string | ArrayBuffer): string | null 
         return null
     } else if (!['user.list', 'user.update', 'records.list_schemas'].includes(frame.type))
       return null
+
     return JSON.stringify({
       type: frame.type,
       payload:

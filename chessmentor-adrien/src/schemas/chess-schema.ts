@@ -1,5 +1,16 @@
+/**
+ * DeepSpace collection definitions for games, messages and move feedback.
+ * src/chess/types.ts defines the TypeScript payloads and command validation.
+ * RecordRoom (assembled in worker.ts) enforces these client permissions; privileged
+ * server writes must separately pass service.ts ownership checks.
+ */
+
+// SDK collection contracts and built-in schema definitions: node_modules/deepspace/dist/schema.js.
+// Public signatures: node_modules/deepspace/dist/schema.d.ts.
 import type { CollectionSchema } from 'deepspace/schema'
+
 const locked = { read: 'own', create: false, update: false, delete: false } as const
+
 function collection(
   name: string,
   fields: string[],
@@ -41,6 +52,7 @@ function collection(
     ],
   }
 }
+
 export const chessSchemas = [
   collection(
     'games',

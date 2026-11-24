@@ -1,12 +1,23 @@
+/**
+ * Application checks layered on the DeepSpace JWT verifier.
+ * The SDK checks signature and issuer; this wrapper also requires a usable, unexpired
+ * player identity and enforces the local block list. Membership and game ownership
+ * are checked later in action-routes.ts and src/chess/service.ts respectively.
+ */
+
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import { verifyJwt } from 'deepspace/worker'
 import type { Env } from '../../worker'
 
 export async function verifyUserToken(env: Env, token: string | null) {
   if (!token || token.length > 8192) return null
+
   const { result } = await verifyJwt(
     { publicKey: env.AUTH_JWT_PUBLIC_KEY, issuer: env.AUTH_JWT_ISSUER },
     token,
   )
+
   if (
     !result ||
     typeof result.userId !== 'string' ||
@@ -23,5 +34,6 @@ export async function verifyUserToken(env: Env, token: string | null) {
       .includes(result.userId)
   )
     return null
+
   return result
 }

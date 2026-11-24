@@ -40,12 +40,14 @@ const REACT_ERROR_TABLE: Record<number, Omit<DecodedReactError, 'code' | 'docsUr
   },
   301: {
     title: 'Too many re-renders',
-    explanation: 'React hit its render limit because the component updated state while rendering, which triggers an infinite render loop.',
+    explanation:
+      'React hit its render limit because the component updated state while rendering, which triggers an infinite render loop.',
     hint: 'Don’t call setState (or a mutation) directly in the render body. Move it into an event handler or an effect with the right dependencies.',
   },
   321: {
     title: 'A hook was called in an invalid place',
-    explanation: 'Hooks can only be called at the top level of a function component or another hook.',
+    explanation:
+      'Hooks can only be called at the top level of a function component or another hook.',
     hint: 'Move the hook out of any condition, loop, callback, or plain (non-component) function. This can also mean two copies of React are installed.',
   },
 }
@@ -53,16 +55,20 @@ const REACT_ERROR_TABLE: Record<number, Omit<DecodedReactError, 'code' | 'docsUr
 /** Pull a React error code out of a message, whether minified, URL, or legacy form. */
 function extractReactErrorCode(message: string): number | null {
   const patterns = [/react\.dev\/errors\/(\d+)/, /invariant=(\d+)/, /Minified React error #(\d+)/]
+
   for (const re of patterns) {
     const match = message.match(re)
+
     if (match) return Number(match[1])
   }
+
   return null
 }
 
 function errorMessage(error: unknown): string | null {
   if (typeof error === 'string') return error
   if (error instanceof Error) return error.message
+
   return null
 }
 
@@ -73,11 +79,15 @@ function errorMessage(error: unknown): string | null {
  */
 export function decodeReactError(error: unknown): DecodedReactError | null {
   const message = errorMessage(error)
+
   if (!message) return null
+
   const code = extractReactErrorCode(message)
+
   if (code == null) return null
 
   const known = REACT_ERROR_TABLE[code]
+
   return {
     code,
     docsUrl: `https://react.dev/errors/${code}`,
@@ -136,7 +146,9 @@ export function ErrorScreen({ error, onReset }: ErrorScreenProps) {
 
         {import.meta.env.DEV && stack && (
           <details className="mt-2 text-left">
-            <summary className="cursor-pointer text-xs text-muted-foreground">Show stack trace</summary>
+            <summary className="cursor-pointer text-xs text-muted-foreground">
+              Show stack trace
+            </summary>
             <pre className="mt-1 max-h-60 overflow-auto rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               {stack}
             </pre>

@@ -10,6 +10,7 @@ import {
   DialogFooter as DFooter,
 } from './Dialog'
 import { Button } from './Button'
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 // ============================================================================
@@ -43,7 +44,12 @@ export function Modal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose()
+      }}
+    >
       <DialogContent
         aria-describedby={undefined}
         className={cn(sizes[size], 'flex flex-col max-h-[85vh]', className)}
@@ -65,11 +71,7 @@ interface ModalHeaderProps {
 }
 
 function ModalHeader({ children, className = '' }: ModalHeaderProps): JSX.Element {
-  return (
-    <DHeader className={className}>
-      {children}
-    </DHeader>
-  )
+  return <DHeader className={className}>{children}</DHeader>
 }
 
 // ============================================================================
@@ -84,11 +86,7 @@ interface ModalTitleProps {
 function ModalTitle({ children, className = '' }: ModalTitleProps): JSX.Element {
   // min-w-0 + truncate: long unbroken strings (filenames, URLs) ellipsize
   // instead of stretching the dialog.
-  return (
-    <DTitle className={cn('min-w-0 truncate', className)}>
-      {children}
-    </DTitle>
-  )
+  return <DTitle className={cn('min-w-0 truncate', className)}>{children}</DTitle>
 }
 
 // ============================================================================
@@ -101,11 +99,7 @@ interface ModalDescriptionProps {
 }
 
 function ModalDescription({ children, className = '' }: ModalDescriptionProps): JSX.Element {
-  return (
-    <DDescription className={className}>
-      {children}
-    </DDescription>
-  )
+  return <DDescription className={className}>{children}</DDescription>
 }
 
 // ============================================================================
@@ -140,11 +134,7 @@ interface ModalFooterProps {
 }
 
 function ModalFooter({ children, className = '' }: ModalFooterProps): JSX.Element {
-  return (
-    <DFooter className={className}>
-      {children}
-    </DFooter>
-  )
+  return <DFooter className={className}>{children}</DFooter>
 }
 
 // ============================================================================
@@ -197,9 +187,13 @@ export function ConfirmModal({
 // ============================================================================
 
 Modal.Header = ModalHeader
+
 Modal.Title = ModalTitle
+
 Modal.Description = ModalDescription
+
 Modal.Body = ModalBody
+
 Modal.Footer = ModalFooter
 
 export default Modal

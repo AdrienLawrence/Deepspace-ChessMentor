@@ -1,4 +1,12 @@
+/**
+ * Board rendering, square selection, promotion choices and annotation geometry.
+ * chess.js generates candidate moves for the supplied FEN; server rules revalidate submissions.
+ * ChessPiece.tsx owns the SVG artwork. onMove is supplied by GameWorkspace.tsx,
+ * or omitted for BoardThumbnail: this component never saves a move itself.
+ */
+
 import { useId, useMemo, useState } from 'react'
+// Chess rules and notation are implemented by the chess.js dependency (node_modules/chess.js).
 import { Chess, type Square } from 'chess.js'
 import type { Annotation, Color } from '../../chess/types'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog'
@@ -12,12 +20,17 @@ const names: Record<string, string> = {
   n: 'knight',
   p: 'pawn',
 }
+
 const tones = { red: '#ed7373', blue: '#77aeed', yellow: '#edc66e', green: '#8ac9a2' }
+
+/** Map algebraic square coordinates to the displayed orientation, shared by annotation shapes. */
 export function boardPoint(square: string, orientation: Color) {
-  const file = square.charCodeAt(0) - 97,
-    rank = Number(square[1]) - 1
+  const file = square.charCodeAt(0) - 97
+  const rank = Number(square[1]) - 1
+
   return orientation === 'w' ? { x: file, y: 7 - rank } : { x: 7 - file, y: rank }
 }
+
 export function AnnotationOverlay({
   annotations,
   orientation,
@@ -26,6 +39,7 @@ export function AnnotationOverlay({
   orientation: Color
 }) {
   const id = useId().replace(/:/g, '')
+
   return (
     <svg className="annotation-overlay" viewBox="0 0 800 800" aria-label="Mentor board annotations">
       <defs>
@@ -45,6 +59,7 @@ export function AnnotationOverlay({
       </defs>
       {annotations.map((a, i) => {
         const p = boardPoint(a.type === 'arrow' ? a.from : a.square, orientation)
+
         if (a.type === 'highlight')
           return (
             <rect
@@ -62,7 +77,9 @@ export function AnnotationOverlay({
               <title>{a.label || a.tone}</title>
             </rect>
           )
+
         const q = boardPoint(a.to, orientation)
+
         return (
           <line
             key={i}
@@ -83,6 +100,7 @@ export function AnnotationOverlay({
     </svg>
   )
 }
+
 interface Props {
   fen: string
   orientation: Color
@@ -91,6 +109,7 @@ interface Props {
   annotations?: Annotation[]
   onMove?: (uci: string) => void
 }
+
 export function Chessboard({
   fen,
   orientation,
@@ -105,19 +124,25 @@ export function Chessboard({
   const moves = selected ? chess.moves({ square: selected, verbose: true }) : []
   const files = orientation === 'w' ? 'abcdefgh' : 'hgfedcba'
   const ranks = orientation === 'w' ? '87654321' : '12345678'
+
   function choose(square: Square) {
     if (!interactive) return
+
     const candidates = moves.filter((m) => m.to === square)
+
     if (selected && candidates.length) {
       const uci = selected + square
+
       if (candidates.some((m) => m.promotion)) setPromotion(uci)
       else onMove?.(uci)
+
       setSelected(null)
     } else
       setSelected(
         chess.get(square)?.color === chess.turn() ? (square === selected ? null : square) : null,
       )
   }
+
   function moveFocus(event: React.KeyboardEvent<HTMLButtonElement>, row: number, column: number) {
     const delta: Record<string, [number, number]> = {
       ArrowUp: [-1, 0],
@@ -125,11 +150,13 @@ export function Chessboard({
       ArrowLeft: [0, -1],
       ArrowRight: [0, 1],
     }
+
     if (event.key === 'Escape') {
       setSelected(null)
       setPromotion(null)
     }
     if (!delta[event.key]) return
+
     event.preventDefault()
     const [dr, dc] = delta[event.key]
     const next = event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(
@@ -137,6 +164,7 @@ export function Chessboard({
     )
     next?.focus()
   }
+
   return (
     <div className="board-shell">
       <div
@@ -146,10 +174,11 @@ export function Chessboard({
       >
         {[...ranks].flatMap((rank, row) =>
           [...files].map((file, col) => {
-            const square = (file + rank) as Square,
-              piece = chess.get(square)
+            const square = (file + rank) as Square
+            const piece = chess.get(square)
             const destination = interactive && moves.some((m) => m.to === square)
             const check = piece?.type === 'k' && piece.color === chess.turn() && chess.isCheck()
+
             return (
               <button
                 key={square}
@@ -197,6 +226,7 @@ export function Chessboard({
                   aria-label={`Promote to ${names[p]}`}
                   onClick={() => {
                     if (promotion) onMove?.(promotion + p)
+
                     setPromotion(null)
                   }}
                 >
@@ -217,6 +247,7 @@ export function Chessboard({
 /** Decorative game-card board: no nested controls or extra keyboard stops. */
 export function BoardThumbnail({ fen, orientation }: { fen: string; orientation: Color }) {
   const chess = useMemo(() => new Chess(fen), [fen])
+
   return (
     <div className="board-shell">
       <svg viewBox="0 0 80 80" role="img" aria-label="Saved game position">
@@ -236,6 +267,7 @@ export function BoardThumbnail({ fen, orientation }: { fen: string; orientation:
           .filter((p) => p !== null)
           .map((p) => {
             const at = boardPoint(p.square, orientation)
+
             return (
               <svg
                 key={p.square}

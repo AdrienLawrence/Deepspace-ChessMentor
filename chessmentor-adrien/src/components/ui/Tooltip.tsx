@@ -1,6 +1,8 @@
 import * as React from 'react'
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/tooltip in node_modules.
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 /**
@@ -35,7 +37,12 @@ function TooltipContent({
 }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-50">
+      <TooltipPrimitive.Positioner
+        side={side}
+        align={align}
+        sideOffset={sideOffset}
+        className="z-50"
+      >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(

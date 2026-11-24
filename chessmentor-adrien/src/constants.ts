@@ -12,6 +12,7 @@ export const APP_NAME = 'ChessMentor'
  *  Do not replace this with a literal: that is how a staging browser ends up
  *  reading production's rooms. */
 declare const __DEEPSPACE_APP_ID__: string
+
 export const APP_ID: string = __DEEPSPACE_APP_ID__
 
 /** Primary scope ID for the app's RecordRoom DO */

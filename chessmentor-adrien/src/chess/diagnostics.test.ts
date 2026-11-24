@@ -32,6 +32,7 @@ describe('AI failure diagnostics', () => {
   })
   it('emits structured failures at error level for filtering by trace ID', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+
     try {
       traceEvent('trace-1', 'model.failed', { code: 'insufficient_credits', durationMs: 12 }, true)
       expect(JSON.parse(log.mock.calls[0][0])).toEqual({

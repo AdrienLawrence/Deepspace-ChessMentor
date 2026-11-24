@@ -39,12 +39,10 @@
  *   }
  */
 
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import type { Job, JobContext } from 'deepspace/worker'
 
-export async function runJob(
-  _job: Job,
-  _ctx: JobContext,
-  _env: unknown,
-): Promise<void> {
+export async function runJob(_job: Job, _ctx: JobContext, _env: unknown): Promise<void> {
   // No-op — implement your job handlers here. Dispatch on `_job.type`.
 }

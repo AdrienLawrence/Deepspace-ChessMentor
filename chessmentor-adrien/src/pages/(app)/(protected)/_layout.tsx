@@ -15,6 +15,8 @@
 
 import { useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
+// Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
+// Public signatures: node_modules/deepspace/dist/index.d.ts.
 import { AuthGate, AuthOverlay } from 'deepspace'
 import { Button } from '@/components/ui'
 

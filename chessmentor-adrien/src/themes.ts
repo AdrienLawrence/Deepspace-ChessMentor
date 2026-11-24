@@ -34,7 +34,9 @@ export type ThemeId = (typeof THEMES)[number]['id']
 /** Read the currently active theme id from <html data-theme>. */
 export function getActiveTheme(): ThemeId {
   if (typeof document === 'undefined') return 'slate'
+
   const id = document.documentElement.getAttribute('data-theme') as ThemeId | null
+
   return id ?? 'slate'
 }
 

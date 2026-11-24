@@ -1,21 +1,30 @@
+/**
+ * Game setup form. src/chess/client.ts sends the create command; service.ts resolves
+ * random color and stores the new game. BoardThumbnail comes from Chessboard.tsx.
+ */
+
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Sparkles, Shuffle } from 'lucide-react'
 import { chessAction } from '../../../../chess/client'
 import { ChessPiece } from '../../../../components/chess/ChessPiece'
+
 export default function NewGamePage() {
   const [color, setColor] = useState<'w' | 'b' | 'random'>('w')
-  const [feedback, setFeedback] = useState(false),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('')
-  const id = useRef(crypto.randomUUID()),
-    submitting = useRef(false),
-    navigate = useNavigate()
+  const [feedback, setFeedback] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const id = useRef(crypto.randomUUID())
+  const submitting = useRef(false)
+  const navigate = useNavigate()
+
   async function start() {
     if (submitting.current) return
+
     submitting.current = true
     setBusy(true)
     setError('')
+
     try {
       const game = await chessAction({
         op: 'create',
@@ -30,6 +39,7 @@ export default function NewGamePage() {
       setBusy(false)
     }
   }
+
   return (
     <div className="setup-page">
       <Link className="back-link" to="/home">

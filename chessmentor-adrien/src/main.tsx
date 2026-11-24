@@ -28,6 +28,7 @@ async function main() {
   }
 
   const app = <RouterProvider router={router} />
+
   // A prerendered page marks the route it holds; everything else (client routes
   // are served the empty shell) renders from scratch.
   if (root.dataset.prerendered === window.location.pathname && !router.state.errors) {

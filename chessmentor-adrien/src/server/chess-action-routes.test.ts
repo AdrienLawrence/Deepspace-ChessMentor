@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppContext, Env } from '../../worker'
+
 const { action } = vi.hoisted(() => ({ action: vi.fn() }))
+
 vi.mock('../actions/index.js', () => ({ actions: { chess: action } }))
+
 vi.mock('deepspace/worker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('deepspace/worker')>()),
   resolveAppMembership: async () => ({ member: true, role: 'member' }),
 }))
+
 import { registerActionRoutes } from './action-routes'
 
 describe('chess HTTP failure visibility', () => {

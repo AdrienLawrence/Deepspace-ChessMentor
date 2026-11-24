@@ -1,7 +1,9 @@
 import type { ComponentProps } from 'react'
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 type Variant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info'
+
 type Size = 'default' | 'sm' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {

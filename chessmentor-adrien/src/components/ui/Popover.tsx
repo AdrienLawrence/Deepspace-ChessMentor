@@ -1,9 +1,13 @@
+// Base UI supplies the accessible primitive behavior; see @base-ui/react/popover in node_modules.
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 
+// Local class-name helper: src/lib/utils.ts wraps clsx and tailwind-merge.
 import { cn } from '@/lib/utils'
 
 const Popover = PopoverPrimitive.Root
+
 const PopoverTrigger = PopoverPrimitive.Trigger
+
 const PopoverClose = PopoverPrimitive.Close
 
 function PopoverContent({
@@ -19,7 +23,12 @@ function PopoverContent({
 }) {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-50">
+      <PopoverPrimitive.Positioner
+        side={side}
+        align={align}
+        sideOffset={sideOffset}
+        className="z-50"
+      >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(

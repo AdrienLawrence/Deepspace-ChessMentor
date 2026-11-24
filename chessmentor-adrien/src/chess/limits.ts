@@ -1,18 +1,29 @@
+/**
+ * Persistent request, game-creation and model-attempt budgets.
+ * worker.ts supplies Cloudflare Durable Object storage through AtomicLimitStorage.
+ * Transactions reserve all applicable counters together; these are app limits, not
+ * DeepSpace billing caps. The in-memory queue is separate, in service.ts.
+ */
+
 import { ChessError } from './errors'
 
 export interface LimitStorage {
   get<T>(key: string): Promise<T | undefined>
   put<T>(key: string, value: T): Promise<void>
 }
+
 export interface AtomicLimitStorage extends LimitStorage {
   transaction<T>(callback: (txn: LimitStorage) => Promise<T>): Promise<T>
 }
+
 export interface LimitConfig {
   CHESS_AI_ENABLED?: string
   CHESS_AI_USER_DAILY?: string
   CHESS_AI_APP_DAILY?: string
 }
+
 export const LIMIT_DEFAULTS = { userDaily: 300, appDaily: 1000, concurrent: 4 } as const
+
 export interface UsageStatus {
   enabled: boolean
   appDailyLimit: number
@@ -20,11 +31,16 @@ export interface UsageStatus {
   appUsedToday: number
   resetsAt: number
 }
+
 type Rule = { key: string; limit: number; interval: number }
+
 type Window = { start: number; count: number }
-const MINUTE = 60_000,
-  HOUR = 60 * MINUTE,
-  DAY = 24 * HOUR
+
+const MINUTE = 60_000
+
+const HOUR = 60 * MINUTE
+
+const DAY = 24 * HOUR
 
 function configured(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback
@@ -34,17 +50,20 @@ function configured(value: string | undefined, fallback: number): number {
       503,
       'usage_configuration',
     )
+
   return Number(value)
 }
 
 /** All windows are reserved together or none are; no lost updates across users. */
 async function consume(txn: LimitStorage, rules: Rule[], now: number) {
   const pending: [string, Window][] = []
+
   for (const rule of rules) {
     const key = `chess-limits:${rule.key}`
     const stored = await txn.get<Window>(key)
     const start = Math.floor(now / rule.interval) * rule.interval
     const count = stored?.start === start ? stored.count : 0
+
     if (count >= rule.limit)
       throw new ChessError(
         'Usage limit reached. Please wait before trying again.',
@@ -52,11 +71,13 @@ async function consume(txn: LimitStorage, rules: Rule[], now: number) {
         'usage_limit',
         Math.max(1, Math.ceil((start + rule.interval - now) / 1000)),
       )
+
     pending.push([key, { start, count: count + 1 }])
   }
   for (const [key, value] of pending) await txn.put(key, value)
 }
 
+/** Called by worker.ts before queueing a chess command, so waiting work also consumes admission. */
 export async function admitRequest(storage: AtomicLimitStorage, userId: string, now = Date.now()) {
   await storage.transaction((txn) =>
     consume(
@@ -70,6 +91,7 @@ export async function admitRequest(storage: AtomicLimitStorage, userId: string, 
   )
 }
 
+/** Called only when a new game or branch will actually be written, after duplicate detection. */
 export async function admitCreation(storage: AtomicLimitStorage, userId: string, now = Date.now()) {
   await storage.transaction((txn) =>
     consume(
@@ -85,7 +107,10 @@ export async function admitCreation(storage: AtomicLimitStorage, userId: string,
 }
 
 type Lease = { id: string; expires: number }
+
 const LEASE_KEY = 'chess-limits:model-leases'
+
+/** Read today's counters for diagnostics without reserving another AI attempt. */
 export async function readUsage(
   storage: LimitStorage,
   config: LimitConfig,
@@ -93,6 +118,7 @@ export async function readUsage(
 ): Promise<UsageStatus> {
   const start = Math.floor(now / DAY) * DAY
   const current = await storage.get<Window>('chess-limits:model-day:app')
+
   return {
     enabled: config.CHESS_AI_ENABLED !== 'false',
     appDailyLimit: configured(config.CHESS_AI_APP_DAILY, LIMIT_DEFAULTS.appDaily),
@@ -101,7 +127,12 @@ export async function readUsage(
     resetsAt: start + DAY,
   }
 }
-/** Reserve before each provider request. Failures count; duplicate saved results don't. */
+
+/**
+ * Reserve before each provider request. Failures count; duplicate saved results don't.
+ * Return a release callback for worker.ts's finally block. Releasing frees the
+ * concurrency slot, not the attempt counters: a failed request may still cost credits.
+ */
 export async function reserveModel(
   storage: AtomicLimitStorage,
   userId: string,
@@ -116,11 +147,13 @@ export async function reserveModel(
       503,
       'usage_configuration',
     )
+
   const userDaily = configured(config.CHESS_AI_USER_DAILY, LIMIT_DEFAULTS.userDaily)
   const appDaily = configured(config.CHESS_AI_APP_DAILY, LIMIT_DEFAULTS.appDaily)
   const id = crypto.randomUUID()
   await storage.transaction(async (txn) => {
     const leases = ((await txn.get<Lease[]>(LEASE_KEY)) ?? []).filter((l) => l.expires > now)
+
     if (leases.length >= LIMIT_DEFAULTS.concurrent)
       throw new ChessError(
         'The AI is serving other players. Please try again shortly.',
@@ -128,6 +161,7 @@ export async function reserveModel(
         'ai_capacity',
         10,
       )
+
     await consume(
       txn,
       [
@@ -141,6 +175,7 @@ export async function reserveModel(
     )
     await txn.put(LEASE_KEY, [...leases, { id, expires: now + 60_000 }])
   })
+
   return async () => {
     await storage.transaction(async (txn) => {
       const leases = (await txn.get<Lease[]>(LEASE_KEY)) ?? []

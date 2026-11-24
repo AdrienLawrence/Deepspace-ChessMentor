@@ -4,6 +4,8 @@
  * Admin-only settings collection for key-value app configuration.
  */
 
+// SDK collection contracts and built-in schema definitions: node_modules/deepspace/dist/schema.js.
+// Public signatures: node_modules/deepspace/dist/schema.d.ts.
 import type { CollectionSchema } from 'deepspace/schema'
 
 export const settingsSchema: CollectionSchema = {

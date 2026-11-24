@@ -6,9 +6,15 @@
  *
  * The CLI only bridges a local assistant to these Worker routes. It does not
  * authorize or host either assistant.
+ *
+ * ChessMentor uses the owner-only local tools configured in worker.ts. Its chess
+ * mentor is a separate flow in src/chess/service.ts and src/chess/ai.ts, not this
+ * generic SDK assistant/chat pipeline. The inApp option controls that pipeline.
  */
 
 import type { Hono } from 'hono'
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import { registerAgentToolRoutes, resolveAppMembership } from 'deepspace/worker'
 import type { AgentToolAccessResult, AgentToolRouteOptions, JwtClaims } from 'deepspace/worker'
 import { registerAiChatRoutes } from './chat-routes.js'
@@ -54,6 +60,7 @@ export interface RegisterAgentOptions {
 function createAccessResolver(options: RegisterAgentOptions, resolveIdentity: typeof resolveAuth) {
   return async (request: Request, env: Env): Promise<AgentToolAccessResult> => {
     const auth = await resolveIdentity(request, env)
+
     if (!auth) return { ok: false, status: 401 }
 
     // Membership has exactly one definition — the caller's row in the users
@@ -65,6 +72,7 @@ function createAccessResolver(options: RegisterAgentOptions, resolveIdentity: ty
     // the tools run exactly where membership was checked.
     const room = options.room?.(auth.userId, env)
     const membership = await resolveAppMembership(env, auth.userId, request.signal, { room })
+
     if (!membership) return { ok: false, status: 503 }
     if (!membership.member) return { ok: false, status: 403 }
 

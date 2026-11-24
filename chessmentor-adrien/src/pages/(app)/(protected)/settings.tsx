@@ -3,6 +3,8 @@
  * because (protected)/_layout.tsx already wraps the subtree in <AuthGate>.
  */
 
+// Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
+// Public signatures: node_modules/deepspace/dist/index.d.ts.
 import { signOut, useUser } from 'deepspace'
 import { Button } from '@/components/ui'
 

@@ -1,5 +1,12 @@
+/**
+ * Presentation-only move list and navigation controls.
+ * GameWorkspace.tsx owns the selected ply and restores live mode at the latest move.
+ * The onSelect callbacks change that selection; they do not fetch data or request AI.
+ */
+
 import { ChevronLeft, ChevronRight, ChevronsLeft, Radio } from 'lucide-react'
 import type { MoveEntry } from '../../chess/types'
+
 export function MoveNavigation({
   ply,
   total,
@@ -32,6 +39,7 @@ export function MoveNavigation({
     </div>
   )
 }
+
 export function MoveHistory({
   moves,
   ply,

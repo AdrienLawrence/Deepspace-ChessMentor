@@ -1,3 +1,8 @@
+/**
+ * Shared SVG piece artwork for Chessboard.tsx, thumbnails and promotion choices.
+ * Explicit colors keep white/black pieces consistent across browsers and operating systems.
+ */
+
 import type { Color } from '../../chess/types'
 
 export type PieceKind = 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
@@ -6,6 +11,7 @@ export type PieceKind = 'p' | 'n' | 'b' | 'r' | 'q' | 'k'
 export function PieceArt({ type, color }: { type: PieceKind; color: Color }) {
   const fill = color === 'w' ? '#fff9ec' : '#242622'
   const stroke = color === 'w' ? '#302b22' : '#d5c6a9'
+
   return (
     <g fill={fill} stroke={stroke} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
       {type === 'p' && (

@@ -10,6 +10,8 @@ import type { Hono } from 'hono'
 import { verifyUserToken } from './auth'
 import { securityEvent } from './security'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import {
   apiWorkerFetch,
   authWorkerFetch,
@@ -41,7 +43,9 @@ function jwtConfig(env: Env): JwtVerifierConfig {
 export async function resolveAuth(req: Request, env: Env): Promise<VerifyResult | null> {
   const header = req.headers.get('Authorization')
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null
+
   if (!token) return null
+
   return verifyUserToken(env, token)
 }
 
@@ -49,7 +53,9 @@ export async function resolveAuth(req: Request, env: Env): Promise<VerifyResult 
 export async function resolveAgentAuth(req: Request, env: Env): Promise<VerifyResult | null> {
   const header = req.headers.get('Authorization')
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null
+
   if (!token) return null
+
   return (await verifyAgentToken(jwtConfig(env), token, new URL(req.url).origin)).result
 }
 
@@ -61,7 +67,9 @@ export async function resolveAgentAuth(req: Request, env: Env): Promise<VerifyRe
 function reassertAppIdentity(headers: Headers, env: Env): void {
   headers.delete('x-app-identity-token')
   headers.delete('x-app-id')
+
   if (!env.APP_IDENTITY_TOKEN) return
+
   headers.set('x-app-identity-token', env.APP_IDENTITY_TOKEN)
   headers.set('x-app-id', env.DEEPSPACE_APP_ID)
 }
@@ -89,6 +97,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
   // Social OAuth redirect + code exchange.
   app.get('/api/auth/social-redirect', (c) => {
     const provider = c.req.query('provider')
+
     if (!provider) return c.json({ error: 'Missing provider' }, 400)
 
     const appOrigin = new URL(c.req.url).origin
@@ -103,6 +112,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
     if (c.req.query('redirect_uri')) {
       return nativeAuthCallback(c.req.raw, c.env, nativeAuthOptions(c.env))
     }
+
     const code = c.req.query('code')
     const appOrigin = new URL(c.req.url).origin
     // Land the signed-in user in the app, not on the static landing. `/` is a
@@ -120,13 +130,18 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
 
     if (!res.ok) {
       securityEvent('oauth_exchange_failed', { route: 'auth', status: res.status })
+
       return c.redirect(appHome)
     }
+
     const data = (await res.json()) as { sessionToken?: string }
+
     if (!data.sessionToken) {
       securityEvent('oauth_session_missing', { route: 'auth', status: 502 })
+
       return c.redirect(appHome)
     }
+
     const sessionToken = data.sessionToken
 
     return new Response(null, {
@@ -140,6 +155,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
 
   app.all('/api/auth/sign-out', async (c) => {
     if (c.req.method !== 'POST') return c.json({ error: 'Method not allowed' }, 405)
+
     try {
       await authWorkerFetch(c.env, '/api/auth/sign-out', {
         method: c.req.method,
@@ -170,9 +186,11 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
     })
     const headers = new Headers(res.headers)
     const setCookie = headers.get('set-cookie')
+
     if (setCookie) {
       headers.set('set-cookie', setCookie.replace(/;\s*Domain=[^;]*/gi, ''))
     }
+
     return new Response(res.body, { status: res.status, headers })
   })
 
@@ -184,14 +202,18 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
     if (c.env.ALLOW_DEBUG_ROUTES !== 'true') {
       return c.notFound()
     }
+
     const auth = await resolveAuth(c.req.raw, c.env)
+
     if (!auth) return c.json({ error: 'unauthorized' }, 401)
     if ((await resolveAppRole(c.env, auth.userId)) !== 'admin') {
       return c.json({ error: 'forbidden' }, 403)
     }
+
     const stub = c.env.RECORD_ROOMS.get(
       c.env.RECORD_ROOMS.idFromName(`app:${c.env.DEEPSPACE_APP_ID}`),
     )
+
     // Forward verbatim: the DO dispatches on the original pathname.
     return stub.fetch(c.req.raw)
   })
@@ -200,6 +222,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
   app.get('/api/integrations', async (c) => {
     try {
       const res = await apiWorkerFetch(c.env, '/api/integrations')
+
       return new Response(res.body, { status: res.status, headers: res.headers })
     } catch {
       return c.json({ error: 'Failed to fetch integration catalog' }, 502)
@@ -209,12 +232,16 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
   // OAuth connection state is always user-billed, so forward the caller JWT.
   app.get('/api/integrations/status', async (c) => {
     const auth = await resolveAuth(c.req.raw, c.env)
+
     if (!auth) return c.json({ error: 'Sign in required' }, 401)
+
     const token = c.req.header('Authorization')?.slice(7)
+
     try {
       const res = await apiWorkerFetch(c.env, '/api/integrations/status', {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
+
       return new Response(res.body, { status: res.status, headers: res.headers })
     } catch {
       return c.json({ error: 'Status proxy failed' }, 502)
@@ -223,9 +250,12 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
 
   app.delete('/api/integrations/oauth/:provider/disconnect', async (c) => {
     const auth = await resolveAuth(c.req.raw, c.env)
+
     if (!auth) return c.json({ error: 'Sign in required' }, 401)
+
     const token = c.req.header('Authorization')?.slice(7)
     const provider = c.req.param('provider')
+
     try {
       const res = await apiWorkerFetch(
         c.env,
@@ -235,6 +265,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         },
       )
+
       return new Response(res.body, { status: res.status, headers: res.headers })
     } catch {
       return c.json({ error: 'Disconnect proxy failed' }, 502)
@@ -247,15 +278,20 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
     // reach another api-worker route with the owner's token. Plain
     // identifiers only, and own keys only for the config.
     const target = integrationPath(integrationName, c.req.param('endpoint'))
+
     if (!target) return c.json({ error: 'Unknown integration' }, 404)
+
     const config = lookupOwn(integrations, integrationName)
+
     if (!config) return c.json({ error: 'Unknown integration' }, 404)
+
     const billingMode = config.billing
 
     // Sign-in is required unless the app opts this integration into anonymous
     // use; developer billing would otherwise let any visitor spend the owner's
     // credits. User billing always needs a caller to bill.
     const auth = await resolveAuth(c.req.raw, c.env)
+
     if (!auth && (billingMode === 'user' || !config?.anonymous)) {
       return c.json({ error: 'Sign in required for this integration' }, 401)
     }
@@ -270,6 +306,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
       headers['Authorization'] = `Bearer ${c.env.APP_OWNER_JWT}`
     } else {
       const token = c.req.header('Authorization')?.slice(7)
+
       if (token) headers['Authorization'] = `Bearer ${token}`
     }
 
@@ -289,6 +326,7 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
         headers,
         body,
       })
+
       return new Response(res.body, { status: res.status, headers: res.headers })
     } catch {
       return c.json({ error: 'Integration proxy failed' }, 502)
@@ -317,6 +355,7 @@ export function registerPlatformProxyRoutes(app: Hono<AppContext>): void {
     // caller input and derive it from the verified JWT.
     headers.delete('x-user-id')
     reassertAppIdentity(headers, c.env)
+
     if (userId) headers.set('x-user-id', userId)
 
     const resp = await platformWorkerFetch(
@@ -331,15 +370,18 @@ export function registerPlatformProxyRoutes(app: Hono<AppContext>): void {
     // Rewrite platform URLs in JSON responses to use the app's origin (a HEAD
     // answer has the content-type but no body).
     const contentType = resp.headers.get('content-type') ?? ''
+
     if (contentType.includes('application/json') && c.req.method !== 'HEAD') {
       const body = (await resp.json()) as Record<string, unknown>
       const rewriteUrl = (value: string) => value.replace(/^https?:\/\/[^/]+/, url.origin)
+
       if (typeof body.url === 'string') body.url = rewriteUrl(body.url)
       if (Array.isArray(body.files)) {
         for (const file of body.files as Array<Record<string, unknown>>) {
           if (typeof file.url === 'string') file.url = rewriteUrl(file.url)
         }
       }
+
       return c.json(body, resp.status as ContentfulStatusCode)
     }
 
@@ -354,11 +396,13 @@ export function registerPlatformProxyRoutes(app: Hono<AppContext>): void {
     const route = BROWSER_PROXY_ROUTES.find(
       (candidate) => candidate.method === method && candidate.path === url.pathname,
     )
+
     if (!route) {
       return c.json({ error: 'not_found' }, 404)
     }
 
     const auth = await resolveAuth(c.req.raw, c.env)
+
     if (!auth?.userId) return c.json({ error: 'unauthorized' }, 401)
 
     // Always overwrite caller input with this worker's immutable app id.
@@ -405,6 +449,7 @@ const SPA_SHELL_PATH = '/_spa'
  */
 function namesAFile(pathname: string): boolean {
   const last = pathname.slice(pathname.lastIndexOf('/') + 1)
+
   return last.includes('.')
 }
 
@@ -423,17 +468,20 @@ export function registerStaticRoutes(app: Hono<AppContext>): void {
     if (matches(new URL(c.req.url).pathname, API_PREFIXES)) {
       return c.json({ error: 'not_found' }, 404)
     }
+
     await next()
   })
 
   app.get('*', async (c) => {
     const url = new URL(c.req.url)
     const response = await c.env.ASSETS.fetch(c.req.raw)
+
     if (response.status !== 404) return response
 
     if (namesAFile(url.pathname) || isPlatformReservedPath(url.pathname)) {
       return c.json({ error: 'not_found' }, 404)
     }
+
     // Once the prerender has run, `/` is the landing page, not an empty
     // shell — serving it for /home would paint the landing for a frame and
     // hand crawlers the `/` canonical on every app route. Ask for the plain
@@ -441,10 +489,13 @@ export function registerStaticRoutes(app: Hono<AppContext>): void {
     // `deepspace dev`) misses and falls through to `/` exactly as before.
     url.pathname = SPA_SHELL_PATH
     const shell = await c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw))
+
     if (shell.status !== 404) return shell
+
     // `/`, not `/index.html`: auto-trailing-slash redirects the explicit
     // filename, and the browser would follow it off the URL it asked for.
     url.pathname = '/'
+
     return c.env.ASSETS.fetch(new Request(url.toString(), c.req.raw))
   })
 }

@@ -19,6 +19,7 @@ function play(moves: string[], game = newGame('alice', 'w', false)): Game {
     game,
   )
 }
+
 describe('authoritative chess rules', () => {
   it('creates an empty position at revision and ply zero', () => {
     expect(newGame('alice', 'b', true)).toMatchObject({
@@ -85,6 +86,7 @@ describe('authoritative chess rules', () => {
       type: 'n',
       color: 'w',
     })
+
     for (const piece of ['q', 'r', 'b'])
       expect(replay(commitMove(g, 8, `b7a8${piece}`, 'player')).get('a8')?.type).toBe(piece)
   })
@@ -111,8 +113,8 @@ describe('authoritative chess rules', () => {
   )
   it('resigns for either color without modifying the history', () => {
     for (const color of ['w', 'b'] as const) {
-      const g = newGame('alice', color, false),
-        ended = resign(g, 0)
+      const g = newGame('alice', color, false)
+      const ended = resign(g, 0)
       expect(ended.result).toBe(color === 'w' ? '0-1' : '1-0')
       expect(ended.version).toBe(1)
       expect(ended.moveHistory).toEqual([])
@@ -169,6 +171,7 @@ describe('authoritative chess rules', () => {
         .split(/\s+/)
       const board = new Chess()
       const moves = history.map((san) => board.move(san))
+
       for (const color of ['w', 'b'] as const) {
         // Construct the fixture once; commitMove below replays its complete
         // history. Recommitting every prefix made this test quadratic.

@@ -7,9 +7,12 @@
  * Trim entries below if you want a stricter assistant for your app.
  */
 
+// Generation/tool helpers come from the Vercel AI SDK (node_modules/ai), not the chess rules.
 import { jsonSchema, tool } from 'ai'
 import type { ToolSet } from 'ai'
 import { z } from 'zod/v4'
+// Server-side SDK helpers and Durable Object implementations: node_modules/deepspace/dist/worker.js.
+// Public signatures: node_modules/deepspace/dist/worker.d.ts.
 import { BUILT_IN_TOOLS, applyAiToolDefaults } from 'deepspace/worker'
 import type { ToolSchema, CollectionSchema, AgentToolContext } from 'deepspace/worker'
 import type { Env } from '../../worker'
@@ -40,7 +43,9 @@ type Interpretation = CollectionSchema['columns'][number]['interpretation']
  */
 function interpretationLabel(interpretation: Interpretation): string {
   if (typeof interpretation === 'string') return interpretation
+
   const kind = interpretation.kind
+
   return typeof kind === 'string' ? kind : 'object'
 }
 
@@ -50,6 +55,7 @@ export function buildSystemPrompt(appName: string, schemas: CollectionSchema[]):
       const cols = (s.columns ?? [])
         .map((c) => `${c.name}:${interpretationLabel(c.interpretation)}${c.required ? '!' : ''}`)
         .join(', ')
+
       return `- ${s.name}${cols ? ` (${cols})` : ''}`
     })
     .join('\n')
@@ -83,6 +89,7 @@ export function buildTools(executor: ToolExecutor, context?: AgentToolContext<En
 
   for (const def of BUILT_IN_TOOLS) {
     if (!ALLOWED_TOOL_NAMES.includes(def.name)) continue
+
     const safeName = def.name.replace('.', '_')
     tools[safeName] = tool({
       description: def.description,
@@ -102,6 +109,7 @@ export function buildTools(executor: ToolExecutor, context?: AgentToolContext<En
     execute: async () => {
       if (!context || context.userId !== context.env.OWNER_USER_ID)
         throw new Error('Owner access required')
+
       const stub = context.env.RECORD_ROOMS.get(
         context.env.RECORD_ROOMS.idFromName(`app:${context.env.DEEPSPACE_APP_ID}`),
       )
@@ -111,11 +119,15 @@ export function buildTools(executor: ToolExecutor, context?: AgentToolContext<En
           headers: { 'X-User-Id': context.userId, 'X-App-Action': 'true' },
         }),
       )
+
       if (!response.ok) throw new Error('Security status is temporarily unavailable')
+
       const result = (await response.json()) as { data: { usage: unknown; credential: unknown } }
+
       return { usage: result.data.usage, credential: result.data.credential }
     },
   })
+
   return tools
 }
 
@@ -135,6 +147,7 @@ function buildInputSchema(def: ToolSchema) {
 
   for (const [name, param] of Object.entries(def.params)) {
     let s: z.ZodTypeAny
+
     switch (param.type) {
       case 'string':
         s = z.string()
@@ -152,17 +165,21 @@ function buildInputSchema(def: ToolSchema) {
         s = z.array(z.unknown())
         break
     }
+
     if (param.description) s = s.describe(param.description)
     if (!param.required) s = s.optional()
+
     shape[name] = s
   }
 
   const validator = z.object(shape)
+
   return jsonSchema<Record<string, unknown>>(
     z.toJSONSchema(validator) as Parameters<typeof jsonSchema>[0],
     {
       validate: async (value) => {
         const result = await validator.safeParseAsync(value)
+
         return result.success
           ? { success: true, value: result.data }
           : { success: false, error: result.error }

@@ -1,3 +1,9 @@
+/**
+ * Translate provider failures into safe player-facing errors and structured log events.
+ * ai.ts calls the classifier; telemetry.ts adds retention and dashboard aggregation.
+ * Provider response details are inspected for classification only, never copied to logs.
+ */
+
 export type FailureCode =
   | 'insufficient_credits'
   | 'rate_limited'
@@ -5,6 +11,7 @@ export type FailureCode =
   | 'ai_unavailable'
   | 'ai_configuration'
   | 'invalid_ai_output'
+
 const descriptions: Record<FailureCode, string> = {
   insufficient_credits:
     'AI is paused because the app’s credit balance cannot cover this request. The app owner needs to resolve billing.',
@@ -15,6 +22,7 @@ const descriptions: Record<FailureCode, string> = {
   ai_configuration: 'The AI service configuration needs attention from the app owner.',
   invalid_ai_output: 'The AI returned an unusable response. Your game is saved; you can retry.',
 }
+
 export class AiFailure extends Error {
   constructor(
     public code: FailureCode,
@@ -25,8 +33,10 @@ export class AiFailure extends Error {
     this.name = 'AiFailure'
   }
 }
+
 export function classifyAiFailure(error: unknown): AiFailure {
   if (error instanceof AiFailure) return error
+
   const e = error as {
     statusCode?: number
     status?: number
@@ -52,8 +62,10 @@ export function classifyAiFailure(error: unknown): AiFailure {
             : e instanceof SyntaxError || e?.name === 'ZodError'
               ? 'invalid_ai_output'
               : 'ai_unavailable'
+
   return new AiFailure(code, status, providerRequestId)
 }
+
 export function traceEvent(
   traceId: string,
   stage: string,
@@ -67,6 +79,7 @@ export function traceEvent(
     ...fields,
     message: `chess_trace ${stage} trace=${traceId}`,
   })
+
   if (failed) console.error(line)
   else console.info(line)
 }

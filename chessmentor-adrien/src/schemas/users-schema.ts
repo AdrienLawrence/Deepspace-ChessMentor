@@ -1,3 +1,5 @@
+// SDK collection contracts and built-in schema definitions: node_modules/deepspace/dist/schema.js.
+// Public signatures: node_modules/deepspace/dist/schema.d.ts.
 import { USERS_COLUMNS, type CollectionSchema } from 'deepspace/schema'
 
 export const usersSchema: CollectionSchema = {

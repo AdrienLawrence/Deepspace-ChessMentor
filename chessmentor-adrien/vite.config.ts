@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 import generouted from '@generouted/react-router/plugin'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import checker from 'vite-plugin-checker'
+// SDK Vite/deploy integration: node_modules/deepspace/dist/build.js.
+// Public signatures: node_modules/deepspace/dist/build.d.ts.
 import { deepspaceBuild } from 'deepspace/build'
 import { prerender } from './prerender.ts'
 

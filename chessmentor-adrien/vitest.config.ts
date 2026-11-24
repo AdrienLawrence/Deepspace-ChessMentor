@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
+// SDK Vite/deploy integration: node_modules/deepspace/dist/build.js.
+// Public signatures: node_modules/deepspace/dist/build.d.ts.
 import { appIdDefine } from 'deepspace/build'
 
 const appDir = fileURLToPath(new URL('.', import.meta.url))
