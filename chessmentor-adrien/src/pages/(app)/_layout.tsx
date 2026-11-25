@@ -20,8 +20,7 @@ import { Suspense, type ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 // Browser authentication, hooks and data providers: node_modules/deepspace/dist/index.js.
 // Public signatures: node_modules/deepspace/dist/index.d.ts.
-import { DeepSpaceAuthProvider, useAuthStatus } from 'deepspace'
-import { RecordProvider, RecordScope } from 'deepspace'
+import { DeepSpaceAuthProvider, RecordProvider, RecordScope, useAuthStatus } from 'deepspace'
 import Navigation from '../../components/Navigation'
 import { useToast } from '@/components/ui'
 import { APP_NAME, SCOPE_ID } from '../../constants'
