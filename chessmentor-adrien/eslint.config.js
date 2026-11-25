@@ -1,6 +1,6 @@
 // ESLint — intentionally minimal.
 //
-// One rule is enabled: react-hooks/rules-of-hooks. It catches the most common
+// The Rules of Hooks check catches the most common
 // React crash in this stack — a hook called conditionally or after an early
 // `return` — at author time, instead of as a cryptic "Minified React error
 // #310 / #300" in production. typescript-eslint is here only as the parser so
@@ -33,6 +33,9 @@ export default [
     plugins: { 'react-hooks': reactHooks },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
+      'no-debugger': 'error',
+      'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
+      'no-sparse-arrays': 'error',
     },
   },
 ]
