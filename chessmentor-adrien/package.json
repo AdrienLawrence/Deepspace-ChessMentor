@@ -75,5 +75,9 @@
   "private": true,
   "overrides": {
     "esbuild": "^0.28.2"
+  },
+  "optionalDependencies": {
+    "@emnapi/core": "2.0.0-beta.2",
+    "@emnapi/runtime": "1.11.3"
   }
 }
